@@ -76,6 +76,18 @@ function App() {
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false);
 
+  // Auto-snapshot configuration
+  const [autoSnapshotSettings, setAutoSnapshotSettings] = useState({
+    onAppClose: true,
+    onProjectSwitch: true,
+    periodic: true,
+    periodicIntervalMinutes: 30,
+  });
+
+  // Auto-snapshot state
+  const [lastSnapshotTime, setLastSnapshotTime] = useState<number | null>(null);
+  const [periodicSnapshotTimer, setPeriodicSnapshotTimer] = useState<NodeJS.Timeout | null>(null);
+
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
 
@@ -104,14 +116,27 @@ function App() {
     if (currentProject) {
       loadFileTree();
       startFileWatching();
+      startPeriodicSnapshots();
     }
     
     return () => {
       if (currentProject) {
         stopFileWatching();
+        stopPeriodicSnapshots();
       }
     };
   }, [currentProject]);
+
+  // Manage periodic snapshots
+  useEffect(() => {
+    if (currentProject && autoSnapshotSettings.periodic) {
+      startPeriodicSnapshots();
+    } else {
+      stopPeriodicSnapshots();
+    }
+    
+    return () => stopPeriodicSnapshots();
+  }, [currentProject, autoSnapshotSettings.periodic, autoSnapshotSettings.periodicIntervalMinutes]);
 
   // Set up file change listener
   useEffect(() => {
@@ -169,6 +194,33 @@ function App() {
     };
   }, []);
 
+  // Set up app close handler for auto-snapshot
+  useEffect(() => {
+    const handleAppClose = async () => {
+      if (currentProject && autoSnapshotSettings.onAppClose) {
+        const hasUnsavedChanges = openTabs.some(tab => tab.isDirty);
+        const timeSinceLastSnapshot = lastSnapshotTime ? (Date.now() - lastSnapshotTime) / (1000 * 60) : Infinity;
+        
+        // Create snapshot if there are unsaved changes or it's been a while since last snapshot
+        if (hasUnsavedChanges || timeSinceLastSnapshot >= 60) {
+          try {
+            await createAutoSnapshot('Auto-snapshot before app close');
+            console.log('Created auto-snapshot before app close');
+          } catch (error) {
+            console.error('Failed to create auto-snapshot on app close:', error);
+          }
+        }
+      }
+    };
+
+    // Listen for app close events
+    window.addEventListener('beforeunload', handleAppClose);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleAppClose);
+    };
+  }, [currentProject, autoSnapshotSettings.onAppClose, openTabs, lastSnapshotTime]);
+
   const startFileWatching = async () => {
     if (!currentProject) return;
     
@@ -186,6 +238,54 @@ function App() {
       await window.electronAPI.fsStopWatching({ projectId: currentProject.id });
     } catch (error) {
       console.error('Failed to stop file watching:', error);
+    }
+  };
+
+  // Auto-snapshot management functions
+  const createAutoSnapshot = async (message: string) => {
+    if (!currentProject) return;
+
+    try {
+      console.log(`Creating auto-snapshot: ${message}`);
+      await window.electronAPI.snapshotCreate({ 
+        projectId: currentProject.id, 
+        message 
+      });
+      setLastSnapshotTime(Date.now());
+      console.log(`Auto-snapshot created successfully: ${message}`);
+    } catch (error) {
+      console.error('Failed to create auto-snapshot:', error);
+    }
+  };
+
+  const startPeriodicSnapshots = () => {
+    if (!currentProject || !autoSnapshotSettings.periodic) return;
+    
+    // Clear any existing timer
+    stopPeriodicSnapshots();
+    
+    const intervalMs = autoSnapshotSettings.periodicIntervalMinutes * 60 * 1000;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      // Only create snapshot if there has been recent activity or unsaved changes
+      const hasUnsavedChanges = openTabs.some(tab => tab.isDirty);
+      const timeSinceLastSnapshot = lastSnapshotTime ? (now - lastSnapshotTime) / (1000 * 60) : Infinity;
+      
+      if (hasUnsavedChanges || timeSinceLastSnapshot >= autoSnapshotSettings.periodicIntervalMinutes) {
+        const timeStr = new Date().toLocaleTimeString();
+        createAutoSnapshot(`Periodic auto-snapshot (${timeStr})`);
+      }
+    }, intervalMs);
+    
+    setPeriodicSnapshotTimer(timer);
+    console.log(`Started periodic snapshots every ${autoSnapshotSettings.periodicIntervalMinutes} minutes`);
+  };
+
+  const stopPeriodicSnapshots = () => {
+    if (periodicSnapshotTimer) {
+      clearInterval(periodicSnapshotTimer);
+      setPeriodicSnapshotTimer(null);
+      console.log('Stopped periodic snapshots');
     }
   };
 
@@ -655,6 +755,17 @@ function App() {
       if (!confirmed) return;
     }
 
+    // Create auto-snapshot on going back to projects if enabled
+    if (currentProject && autoSnapshotSettings.onProjectSwitch) {
+      const hasUnsavedChanges = openTabs.some(tab => tab.isDirty);
+      const timeSinceLastSnapshot = lastSnapshotTime ? (Date.now() - lastSnapshotTime) / (1000 * 60) : Infinity;
+      
+      // Create snapshot if there are unsaved changes or it's been a while since last snapshot
+      if (hasUnsavedChanges || timeSinceLastSnapshot >= 30) {
+        await createAutoSnapshot('Auto-snapshot before returning to project list');
+      }
+    }
+
     // Stop file watching for current project
     if (currentProject) {
       try {
@@ -678,8 +789,25 @@ function App() {
     setShowHistoryPanel(false);
   };
 
+  const handleProjectSelect = async (newProject: Project) => {
+    // Create auto-snapshot of current project before switching (if we have one)
+    if (currentProject && autoSnapshotSettings.onProjectSwitch) {
+      const hasUnsavedChanges = openTabs.some(tab => tab.isDirty);
+      const timeSinceLastSnapshot = lastSnapshotTime ? (Date.now() - lastSnapshotTime) / (1000 * 60) : Infinity;
+      
+      // Create snapshot if there are unsaved changes or it's been a while since last snapshot
+      if (hasUnsavedChanges || timeSinceLastSnapshot >= 30) {
+        console.log(`Creating auto-snapshot before switching from ${currentProject.name} to ${newProject.name}`);
+        await createAutoSnapshot(`Auto-snapshot before switching to "${newProject.name}"`);
+      }
+    }
+
+    // Set the new project
+    setCurrentProject(newProject);
+  };
+
   if (!currentProject) {
-    return <ProjectExplorer onProjectSelect={setCurrentProject} />;
+    return <ProjectExplorer onProjectSelect={handleProjectSelect} />;
   }
 
   return (
@@ -775,6 +903,8 @@ function App() {
         onClose={() => setShowHistoryPanel(false)}
         isOpen={showHistoryPanel}
         className="h-64"
+        autoSnapshotSettings={autoSnapshotSettings}
+        onAutoSnapshotSettingsChange={setAutoSnapshotSettings}
         onRestoreStart={() => {
           console.log('[App] Restore started - stopping file watching and setting restore state');
           setIsRestoringSnapshot(true);

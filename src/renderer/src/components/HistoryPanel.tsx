@@ -18,6 +18,18 @@ interface HistoryPanelProps {
   className?: string;
   onRestoreStart?: () => void;
   onRestoreEnd?: () => void;
+  autoSnapshotSettings?: {
+    onAppClose: boolean;
+    onProjectSwitch: boolean;
+    periodic: boolean;
+    periodicIntervalMinutes: number;
+  };
+  onAutoSnapshotSettingsChange?: (settings: {
+    onAppClose: boolean;
+    onProjectSwitch: boolean;
+    periodic: boolean;
+    periodicIntervalMinutes: number;
+  }) => void;
 }
 
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({
@@ -27,6 +39,8 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
   className = '',
   onRestoreStart,
   onRestoreEnd,
+  autoSnapshotSettings,
+  onAutoSnapshotSettingsChange,
 }) => {
   const [snapshots, setSnapshots] = useState<SnapshotItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -235,6 +249,78 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         </div>
       </div>
 
+      {/* Auto-snapshot Settings */}
+      {autoSnapshotSettings && onAutoSnapshotSettingsChange && (
+        <div className="border-b border-gray-200 p-4 bg-gray-50">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-gray-700">Auto-Snapshot Settings</label>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="flex items-center text-xs">
+                <input
+                  type="checkbox"
+                  checked={autoSnapshotSettings.onAppClose}
+                  onChange={(e) => onAutoSnapshotSettingsChange({
+                    ...autoSnapshotSettings,
+                    onAppClose: e.target.checked
+                  })}
+                  className="mr-2 h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-gray-600">Auto-snapshot on app close</span>
+              </label>
+              
+              <label className="flex items-center text-xs">
+                <input
+                  type="checkbox"
+                  checked={autoSnapshotSettings.onProjectSwitch}
+                  onChange={(e) => onAutoSnapshotSettingsChange({
+                    ...autoSnapshotSettings,
+                    onProjectSwitch: e.target.checked
+                  })}
+                  className="mr-2 h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-gray-600">Auto-snapshot on project switch</span>
+              </label>
+              
+              <div className="space-y-1">
+                <label className="flex items-center text-xs">
+                  <input
+                    type="checkbox"
+                    checked={autoSnapshotSettings.periodic}
+                    onChange={(e) => onAutoSnapshotSettingsChange({
+                      ...autoSnapshotSettings,
+                      periodic: e.target.checked
+                    })}
+                    className="mr-2 h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-gray-600">Periodic auto-snapshots</span>
+                </label>
+                
+                {autoSnapshotSettings.periodic && (
+                  <div className="ml-5 flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">Every</span>
+                    <input
+                      type="number"
+                      min="5"
+                      max="180"
+                      value={autoSnapshotSettings.periodicIntervalMinutes}
+                      onChange={(e) => onAutoSnapshotSettingsChange({
+                        ...autoSnapshotSettings,
+                        periodicIntervalMinutes: Math.max(5, parseInt(e.target.value) || 30)
+                      })}
+                      className="w-12 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <span className="text-xs text-gray-500">minutes</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Snapshots List */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
@@ -252,16 +338,29 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {snapshots.map((snapshot) => (
-              <div key={snapshot.id} className="p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {snapshot.message || 'Untitled Snapshot'}
-                      </p>
-                    </div>
+            {snapshots.map((snapshot) => {
+              const isAutoSnapshot = snapshot.message?.includes('Auto-') || snapshot.message?.includes('auto-');
+              
+              return (
+                <div key={snapshot.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          isAutoSnapshot ? 'bg-green-500' : 'bg-blue-500'
+                        }`}></div>
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {snapshot.message || 'Untitled Snapshot'}
+                        </p>
+                        {isAutoSnapshot && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Auto
+                          </span>
+                        )}
+                      </div>
                     <div className="mt-1 flex items-center space-x-4 text-xs text-gray-500">
                       <span className="flex items-center">
                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -301,7 +400,8 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
