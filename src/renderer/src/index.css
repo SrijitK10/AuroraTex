@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CodeMirror styling */
+.editor-container {
+  font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.editor-container .cm-editor {
+  height: 100%;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.editor-container .cm-content {
+  padding: 16px;
+}
+
+.editor-container .cm-focused {
+  outline: none;
+}
+
+/* File tree */
+.file-tree {
+  @apply select-none;
+}
+
+.file-tree-item {
+  @apply px-2 py-1 rounded transition-colors duration-150;
+  margin: 1px 4px;
+}
+
+.file-tree-item:hover {
+  @apply bg-gray-100;
+}
+
+.file-tree-item.active {
+  @apply bg-blue-100 text-blue-800;
+}
+
+/* Drag and drop */
+.file-tree-item[draggable="true"] {
+  cursor: grab;
+}
+
+.file-tree-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.drag-over {
+  @apply bg-blue-100 border-2 border-blue-300 border-dashed;
+}
+
+.dragging {
+  @apply opacity-50;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Dirty indicator animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.dirty-indicator {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.compile-log {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.topbar {
+  @apply h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4;
+}
+
+.log-panel {
+  @apply h-48 bg-gray-900 text-green-400 border-t border-gray-200;
+}

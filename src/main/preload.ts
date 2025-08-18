@@ -1,0 +1,104 @@
+import { contextBridge, ipcRenderer } from 'electron';
+
+// Define the API interface
+export interface ElectronAPI {
+  // Dialog APIs
+  dialogShowOpenDialog: () => Promise<{ canceled: boolean; filePaths?: string[] }>;
+
+  // Project APIs
+  projectCreate: (payload: { name: string; path?: string; templateId?: string }) => Promise<any>;
+  projectOpen: (payload: { path: string }) => Promise<any>;
+  projectList: () => Promise<any[]>;
+  projectSetMain: (payload: { projectId: string; relPath: string }) => Promise<{ ok: boolean }>;
+  projectOutputPath: (payload: { projectId: string; file?: string }) => Promise<string>;
+
+  // File System APIs
+  fsListTree: (payload: { projectId: string }) => Promise<any[]>;
+  fsReadFile: (payload: { projectId: string; relPath: string }) => Promise<string | Uint8Array>;
+  fsWriteFile: (payload: { projectId: string; relPath: string; content: string; isAutosave?: boolean }) => Promise<{ ok: boolean; mtime: string }>;
+  fsCreateFile: (payload: { projectId: string; relPath: string }) => Promise<{ ok: boolean }>;
+  fsCreateDir: (payload: { projectId: string; relPath: string }) => Promise<{ ok: boolean }>;
+  fsRename: (payload: { projectId: string; oldPath: string; newPath: string }) => Promise<{ ok: boolean }>;
+  fsDelete: (payload: { projectId: string; relPath: string }) => Promise<{ ok: boolean }>;
+  fsStartWatching: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
+  fsStopWatching: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
+
+  // Compile APIs
+  compileRun: (payload: { projectId: string; engine?: string; mainFile?: string }) => Promise<{ jobId: string }>;
+  compileStatus: (payload: { jobId: string }) => Promise<any>;
+  compileErrors: (payload: { jobId: string }) => Promise<any[]>;
+  compileCancel: (payload: { jobId: string }) => Promise<{ ok: boolean }>;
+  compileMock: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
+
+  // Snapshot APIs
+  snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;
+  snapshotList: (payload: { projectId: string }) => Promise<any[]>;
+  snapshotRestore: (payload: { snapshotId: string }) => Promise<{ ok: boolean }>;
+
+  // Settings APIs
+  settingsGet: (payload: { key: string }) => Promise<any>;
+  settingsSet: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>;
+  settingsCheckTeX: () => Promise<{ found: boolean; paths: any }>;
+
+  // Event listeners
+  onCompileProgress: (callback: (event: any, data: any) => void) => void;
+  removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
+  onFileChanged: (callback: (event: any, data: any) => void) => void;
+  removeFileChangedListener: (callback: (event: any, data: any) => void) => void;
+}
+
+// Expose the API to the renderer process
+const electronAPI: ElectronAPI = {
+  // Dialog APIs
+  dialogShowOpenDialog: () => ipcRenderer.invoke('Dialog.ShowOpenDialog'),
+
+  // Project APIs
+  projectCreate: (payload) => ipcRenderer.invoke('Project.Create', payload),
+  projectOpen: (payload) => ipcRenderer.invoke('Project.Open', payload),
+  projectList: () => ipcRenderer.invoke('Project.List'),
+  projectSetMain: (payload) => ipcRenderer.invoke('Project.SetMain', payload),
+  projectOutputPath: (payload) => ipcRenderer.invoke('Project.OutputPath', payload),
+
+  // File System APIs
+  fsListTree: (payload) => ipcRenderer.invoke('FS.ListTree', payload),
+  fsReadFile: (payload) => ipcRenderer.invoke('FS.ReadFile', payload),
+  fsWriteFile: (payload) => ipcRenderer.invoke('FS.WriteFile', payload),
+  fsCreateFile: (payload) => ipcRenderer.invoke('FS.CreateFile', payload),
+  fsCreateDir: (payload) => ipcRenderer.invoke('FS.CreateDir', payload),
+  fsRename: (payload) => ipcRenderer.invoke('FS.Rename', payload),
+  fsDelete: (payload) => ipcRenderer.invoke('FS.Delete', payload),
+  fsStartWatching: (payload) => ipcRenderer.invoke('FS.StartWatching', payload),
+  fsStopWatching: (payload) => ipcRenderer.invoke('FS.StopWatching', payload),
+
+  // Compile APIs
+  compileRun: (payload) => ipcRenderer.invoke('Compile.Run', payload),
+  compileStatus: (payload) => ipcRenderer.invoke('Compile.Status', payload),
+  compileErrors: (payload) => ipcRenderer.invoke('Compile.Errors', payload),
+  compileCancel: (payload) => ipcRenderer.invoke('Compile.Cancel', payload),
+  compileMock: (payload) => ipcRenderer.invoke('Compile.Mock', payload),
+
+  // Snapshot APIs
+  snapshotCreate: (payload) => ipcRenderer.invoke('Snapshot.Create', payload),
+  snapshotList: (payload) => ipcRenderer.invoke('Snapshot.List', payload),
+  snapshotRestore: (payload) => ipcRenderer.invoke('Snapshot.Restore', payload),
+
+  // Settings APIs
+  settingsGet: (payload) => ipcRenderer.invoke('Settings.Get', payload),
+  settingsSet: (payload) => ipcRenderer.invoke('Settings.Set', payload),
+  settingsCheckTeX: () => ipcRenderer.invoke('Settings.CheckTeX'),
+
+  // Event listeners
+  onCompileProgress: (callback) => ipcRenderer.on('Compile.Progress', callback),
+  removeCompileProgressListener: (callback) => ipcRenderer.removeListener('Compile.Progress', callback),
+  onFileChanged: (callback) => ipcRenderer.on('file-changed', callback),
+  removeFileChangedListener: (callback) => ipcRenderer.removeListener('file-changed', callback),
+};
+
+contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+
+// Declare global interface for TypeScript
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}

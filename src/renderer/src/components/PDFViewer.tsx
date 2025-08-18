@@ -1,0 +1,328 @@
+import React, { useEffect, useRef, useState } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set worker source to use the bundled worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.js', import.meta.url).toString();
+
+interface PDFViewerProps {
+  projectId: string | null;
+  refreshTrigger?: number;
+  compilationStatus?: 'idle' | 'compiling' | 'success' | 'error';
+}
+
+export const PDFViewer: React.FC<PDFViewerProps> = ({ 
+  projectId, 
+  refreshTrigger = 0, 
+  compilationStatus = 'idle' 
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [scale, setScale] = useState(1.0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadPDF = async () => {
+    if (!projectId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const pdfUrl = await window.electronAPI.projectOutputPath({
+        projectId,
+        file: 'main.pdf'
+      });
+
+      console.log('Loading PDF from:', pdfUrl);
+      
+      // Check if file exists by trying to fetch it
+      const response = await fetch(pdfUrl);
+      if (!response.ok) {
+        throw new Error('PDF file not found');
+      }
+
+      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      const pdf = await loadingTask.promise;
+      
+      setPdfDoc(pdf);
+      setTotalPages(pdf.numPages);
+      setCurrentPage(1);
+      console.log('PDF loaded successfully:', pdf.numPages, 'pages');
+    } catch (err) {
+      console.error('Error loading PDF:', err);
+      setError('PDF not found. Compile your LaTeX project first.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show message when no project is selected
+  if (!projectId) {
+    return (
+      <div className="h-full flex flex-col bg-white border-l border-gray-200">
+        <div className="p-3 border-b border-gray-200 bg-gray-50">
+          <h3 className="text-sm font-medium text-gray-900">PDF Preview</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-gray-100">
+          <div className="text-center text-gray-500">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-lg font-medium">No project selected</p>
+            <p className="text-sm">Open a project to view PDF preview</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const renderPage = async (pageNum: number) => {
+    if (!pdfDoc || !canvasRef.current) return;
+
+    try {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) return;
+      
+      // Set the canvas size to match the viewport
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      // Clear the canvas before rendering
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+      };
+      
+      const renderTask = page.render(renderContext);
+      await renderTask.promise;
+      
+      console.log(`Rendered page ${pageNum} at scale ${scale} (${viewport.width}x${viewport.height})`);
+    } catch (err) {
+      console.error('Error rendering page:', err);
+      setError('Failed to render PDF page');
+    }
+  };
+
+  useEffect(() => {
+    loadPDF();
+  }, [projectId]);
+
+  // Respond to external refresh triggers (from compile success)
+  useEffect(() => {
+    if (refreshTrigger > 0 && projectId) {
+      console.log('PDF refresh triggered by compilation');
+      loadPDF();
+    }
+  }, [refreshTrigger, projectId]);
+
+  useEffect(() => {
+    console.log(`Scale changed to ${scale}, pdfDoc exists: ${!!pdfDoc}, currentPage: ${currentPage}`);
+    if (pdfDoc && currentPage) {
+      renderPage(currentPage);
+    }
+  }, [pdfDoc, currentPage, scale]);
+
+  // Auto-refresh every 5 seconds to pick up new PDFs (less frequent now since we have triggers)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading && !error && projectId) {
+        loadPDF();
+      }
+    }, 10000); // Reduced to 10 seconds since we have direct triggers
+
+    return () => clearInterval(interval);
+  }, [projectId, loading, error]);
+
+  const goToPage = (pageNum: number) => {
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      setCurrentPage(pageNum);
+    }
+  };
+
+  const zoomIn = () => {
+    const newScale = Math.min(scale + 0.25, 3.0);
+    console.log(`Zoom in: ${scale} -> ${newScale}`);
+    setScale(newScale);
+  };
+
+  const zoomOut = () => {
+    const newScale = Math.max(scale - 0.25, 0.25);
+    console.log(`Zoom out: ${scale} -> ${newScale}`);
+    setScale(newScale);
+  };
+
+  const resetZoom = () => {
+    console.log(`Reset zoom: ${scale} -> 1.0`);
+    setScale(1.0);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-white border-l border-gray-200">
+      {/* PDF Toolbar */}
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-gray-900">PDF Preview</h3>
+          <div className="flex items-center space-x-2">
+            {/* Compilation Status Indicator */}
+            {compilationStatus === 'compiling' && (
+              <div className="flex items-center text-xs text-blue-600">
+                <div className="animate-spin h-3 w-3 border border-blue-600 border-t-transparent rounded-full mr-1"></div>
+                Compiling...
+              </div>
+            )}
+            {compilationStatus === 'success' && (
+              <div className="flex items-center text-xs text-green-600">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Compiled
+              </div>
+            )}
+            {compilationStatus === 'error' && (
+              <div className="flex items-center text-xs text-red-600">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Error
+              </div>
+            )}
+            {loading && (
+              <div className="flex items-center text-xs text-blue-600">
+                <div className="animate-spin h-3 w-3 border border-blue-600 border-t-transparent rounded-full mr-1"></div>
+                Refreshing...
+              </div>
+            )}
+            <button
+              onClick={loadPDF}
+              disabled={loading}
+              className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+              title="Refresh PDF"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Controls */}
+        {pdfDoc && (
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <span className="text-gray-600">
+                {currentPage} / {totalPages}
+              </span>
+
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={zoomOut}
+                className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                title="Zoom Out"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </button>
+
+              <span className="text-xs text-gray-500 w-12 text-center">
+                {Math.round(scale * 100)}%
+              </span>
+
+              <button
+                onClick={zoomIn}
+                className="p-1 rounded hover:bg-gray-100 text-gray-600"
+                title="Zoom In"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+
+              <button
+                onClick={resetZoom}
+                className="p-1 rounded hover:bg-gray-100 text-gray-600 text-xs"
+                title="Reset Zoom"
+              >
+                1:1
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* PDF Content */}
+      <div className="flex-1 bg-gray-100">
+        <div className="h-full overflow-auto p-4">
+          {loading && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-gray-600">Loading PDF...</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center max-w-md">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="text-gray-600 mb-2">{error}</p>
+                <button
+                  onClick={loadPDF}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pdfDoc && !loading && !error && (
+            <div className="w-max mx-auto">
+              <canvas
+                ref={canvasRef}
+                className="shadow-lg border border-gray-300 bg-white block"
+                style={{ 
+                  display: 'block'
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

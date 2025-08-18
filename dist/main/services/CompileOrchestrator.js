@@ -1,0 +1,395 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CompileOrchestrator = void 0;
+const child_process_1 = require("child_process");
+const path_1 = require("path");
+const promises_1 = require("fs/promises");
+const fs_1 = require("fs");
+const uuid_1 = require("uuid");
+const os_1 = require("os");
+const events_1 = require("events");
+const ProjectService_1 = require("./ProjectService");
+const SettingsService_1 = require("./SettingsService");
+class CompileOrchestrator extends events_1.EventEmitter {
+    constructor() {
+        super();
+        this.jobs = new Map();
+        this.queue = [];
+        this.running = false;
+        this.projectService = new ProjectService_1.ProjectService();
+        this.settingsService = new SettingsService_1.SettingsService();
+    }
+    async createMockPDF(projectId) {
+        const project = await this.projectService.getById(projectId);
+        if (!project) {
+            throw new Error('Project not found');
+        }
+        const outputDir = (0, path_1.join)(project.root, 'output');
+        const outputPdf = (0, path_1.join)(outputDir, 'main.pdf');
+        // Create a simple mock PDF content (minimal PDF structure)
+        const mockPdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 44 >>
+stream
+BT
+/F1 24 Tf
+100 700 Td
+(Hello LaTeX!) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000318 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+410
+%%EOF`;
+        // Ensure output directory exists
+        await (0, promises_1.mkdir)(outputDir, { recursive: true });
+        // Write the mock PDF
+        const fs = require('fs').promises;
+        await fs.writeFile(outputPdf, mockPdfContent, 'binary');
+    }
+    async run(projectId, engine, mainFile) {
+        const project = await this.projectService.getById(projectId);
+        if (!project) {
+            throw new Error('Project not found');
+        }
+        const jobId = (0, uuid_1.v4)();
+        const job = {
+            id: jobId,
+            projectId,
+            state: 'queued',
+            progress: 0,
+            logs: [],
+            errors: [],
+        };
+        this.jobs.set(jobId, job);
+        this.queue.push(jobId);
+        // Start processing queue if not already running
+        if (!this.running) {
+            this.processQueue();
+        }
+        return { jobId };
+    }
+    async cancel(jobId) {
+        const job = this.jobs.get(jobId);
+        if (!job) {
+            return { ok: false };
+        }
+        if (job.state === 'running' && job.process) {
+            job.process.kill('SIGTERM');
+            job.state = 'cancelled';
+            job.endTime = new Date();
+        }
+        else if (job.state === 'queued') {
+            job.state = 'cancelled';
+            const queueIndex = this.queue.indexOf(jobId);
+            if (queueIndex > -1) {
+                this.queue.splice(queueIndex, 1);
+            }
+        }
+        return { ok: true };
+    }
+    getStatus(jobId) {
+        const job = this.jobs.get(jobId);
+        if (!job)
+            return null;
+        return {
+            jobId: job.id,
+            state: job.state,
+            progress: job.progress,
+            startTime: job.startTime?.toISOString(),
+            endTime: job.endTime?.toISOString(),
+            logs: job.logs,
+        };
+    }
+    getErrors(jobId) {
+        const job = this.jobs.get(jobId);
+        return job ? job.errors : [];
+    }
+    emitProgress(jobId, data) {
+        this.emit('progress', {
+            jobId,
+            ...data
+        });
+    }
+    async processQueue() {
+        if (this.running || this.queue.length === 0) {
+            return;
+        }
+        this.running = true;
+        while (this.queue.length > 0) {
+            const jobId = this.queue.shift();
+            const job = this.jobs.get(jobId);
+            if (!job || job.state === 'cancelled') {
+                continue;
+            }
+            await this.executeJob(job);
+        }
+        this.running = false;
+    }
+    async executeJob(job) {
+        try {
+            job.state = 'running';
+            job.startTime = new Date();
+            job.progress = 10;
+            // Emit initial progress
+            this.emitProgress(job.id, {
+                state: 'running',
+                percent: 10,
+                message: 'Starting compilation...'
+            });
+            const project = await this.projectService.getById(job.projectId);
+            if (!project) {
+                throw new Error('Project not found');
+            }
+            // Create temporary build directory (Milestone 4: snapshot/lock read-only view)
+            const buildDir = (0, path_1.join)((0, os_1.tmpdir)(), `latex-build-${job.id}`);
+            await (0, promises_1.mkdir)(buildDir, { recursive: true });
+            job.buildDir = buildDir;
+            job.progress = 20;
+            this.emitProgress(job.id, {
+                percent: 20,
+                message: 'Copying project files...'
+            });
+            // Copy project files to build directory
+            await this.copyProjectFiles(project.root, buildDir);
+            job.progress = 40;
+            this.emitProgress(job.id, {
+                percent: 40,
+                message: 'Setting up TeX environment...'
+            });
+            // Get LaTeX binary path
+            const engine = project.settings.engine || 'pdflatex';
+            const latexmkPath = await this.settingsService.getTexBinaryPath('latexmk');
+            console.log(`[CompileOrchestrator] Looking for latexmk, found: ${latexmkPath}`);
+            console.log(`[CompileOrchestrator] Using engine: ${engine}`);
+            if (!latexmkPath) {
+                throw new Error('latexmk not found. Please install TeX Live or configure TeX paths.');
+            }
+            job.progress = 50;
+            this.emitProgress(job.id, {
+                percent: 50,
+                message: 'Running LaTeX compilation...'
+            });
+            // Run compilation
+            console.log(`[CompileOrchestrator] Starting compilation with latexmk at: ${latexmkPath}`);
+            console.log(`[CompileOrchestrator] Build directory: ${buildDir}`);
+            console.log(`[CompileOrchestrator] Main file: ${project.mainFile}`);
+            await this.runLatexmk(job, latexmkPath, buildDir, project.mainFile, engine);
+            // Copy output back to project (Milestone 4: move main.pdf to project/output/main.pdf)
+            const outputDir = (0, path_1.join)(project.root, 'output');
+            await (0, promises_1.mkdir)(outputDir, { recursive: true });
+            // Always copy compile.log (Milestone 4: keep compile.log on error)
+            const logPath = (0, path_1.join)(buildDir, project.mainFile.replace('.tex', '.log'));
+            if ((0, fs_1.existsSync)(logPath)) {
+                await (0, promises_1.copyFile)(logPath, (0, path_1.join)(outputDir, 'compile.log'));
+            }
+            const pdfPath = (0, path_1.join)(buildDir, project.mainFile.replace('.tex', '.pdf'));
+            if ((0, fs_1.existsSync)(pdfPath)) {
+                await (0, promises_1.copyFile)(pdfPath, (0, path_1.join)(outputDir, 'main.pdf'));
+                job.state = 'success';
+                this.emitProgress(job.id, {
+                    state: 'success',
+                    percent: 100,
+                    message: 'Compilation completed successfully!'
+                });
+            }
+            else {
+                job.state = 'error';
+                job.logs.push('ERROR: PDF file not generated');
+                this.emitProgress(job.id, {
+                    state: 'error',
+                    message: 'PDF file not generated'
+                });
+            }
+            job.progress = 100;
+            job.endTime = new Date();
+        }
+        catch (error) {
+            job.state = 'error';
+            job.endTime = new Date();
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            job.logs.push(`ERROR: ${errorMessage}`);
+            this.emitProgress(job.id, {
+                state: 'error',
+                message: errorMessage
+            });
+        }
+    }
+    async copyProjectFiles(sourceDir, destDir) {
+        const entries = await (0, promises_1.readdir)(sourceDir);
+        for (const entry of entries) {
+            // Skip output directory and hidden files
+            if (entry === 'output' || entry.startsWith('.')) {
+                continue;
+            }
+            const sourcePath = (0, path_1.join)(sourceDir, entry);
+            const destPath = (0, path_1.join)(destDir, entry);
+            const stats = await (0, promises_1.stat)(sourcePath);
+            if (stats.isDirectory()) {
+                await (0, promises_1.mkdir)(destPath, { recursive: true });
+                await this.copyProjectFiles(sourcePath, destPath);
+            }
+            else {
+                await (0, promises_1.copyFile)(sourcePath, destPath);
+            }
+        }
+    }
+    async runLatexmk(job, latexmkPath, buildDir, mainFile, engine) {
+        return new Promise((resolve, reject) => {
+            const args = [
+                '-interaction=nonstopmode',
+                '-halt-on-error',
+                '-file-line-error',
+            ];
+            // Add engine-specific flags
+            switch (engine) {
+                case 'xelatex':
+                    args.push('-xelatex');
+                    break;
+                case 'lualatex':
+                    args.push('-lualatex');
+                    break;
+                default:
+                    args.push('-pdf');
+            }
+            args.push(mainFile);
+            // Milestone 4: Set TEXMFVAR & TEXINPUTS to project's temp build dir
+            // Milestone 4: Default no -shell-escape for security
+            const childProcess = (0, child_process_1.spawn)(latexmkPath, args, {
+                cwd: buildDir,
+                env: {
+                    ...process.env,
+                    TEXMFVAR: buildDir,
+                    TEXINPUTS: `${buildDir}:`,
+                    // Milestone 4: Sanitize env - remove potentially sensitive vars
+                    NODE_ENV: undefined,
+                    npm_config_cache: undefined,
+                },
+            });
+            job.process = childProcess;
+            let logBuffer = '';
+            // Milestone 4: Capture stdout/stderr line-by-line to a rolling log
+            childProcess.stdout.on('data', (data) => {
+                const text = data.toString();
+                logBuffer += text;
+                // Split into lines and emit each line as progress
+                const lines = text.split('\n');
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        job.logs.push(line);
+                        // Emit live log lines (Milestone 4)
+                        this.emitProgress(job.id, {
+                            line: line,
+                            percent: Math.min(90, job.progress + 5)
+                        });
+                    }
+                });
+                job.progress = Math.min(90, job.progress + 5);
+            });
+            childProcess.stderr.on('data', (data) => {
+                const text = data.toString();
+                logBuffer += text;
+                // Split into lines and emit each line as progress
+                const lines = text.split('\n');
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        const logLine = `STDERR: ${line}`;
+                        job.logs.push(logLine);
+                        // Emit live log lines for stderr too
+                        this.emitProgress(job.id, {
+                            line: logLine
+                        });
+                    }
+                });
+            });
+            // Milestone 4: Hard timeout (180s default)
+            const timeout = setTimeout(() => {
+                childProcess.kill('SIGTERM');
+                job.state = 'killed';
+                this.emitProgress(job.id, {
+                    state: 'killed',
+                    message: 'Compilation timeout - process killed'
+                });
+                reject(new Error('Compilation timeout'));
+            }, 180000); // 3 minutes
+            childProcess.on('close', (code) => {
+                clearTimeout(timeout);
+                // Parse errors from log
+                job.errors = this.parseLatexErrors(logBuffer, buildDir);
+                if (code === 0) {
+                    resolve();
+                }
+                else {
+                    reject(new Error(`LaTeX compilation failed with exit code ${code}`));
+                }
+            });
+            childProcess.on('error', (error) => {
+                clearTimeout(timeout);
+                reject(error);
+            });
+        });
+    }
+    parseLatexErrors(logContent, buildDir) {
+        const errors = [];
+        const lines = logContent.split('\n');
+        let currentFile = '';
+        const fileStack = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Track file stack using parentheses
+            if (line.includes('(./')) {
+                const match = line.match(/\(\.\/([^)]+)/);
+                if (match) {
+                    currentFile = match[1];
+                    fileStack.push(currentFile);
+                }
+            }
+            // Error patterns
+            const errorMatch = line.match(/^(.+):(\d+):\s*(.+)/);
+            if (errorMatch) {
+                const [, file, lineNum, message] = errorMatch;
+                errors.push({
+                    file: file.replace(buildDir + '/', ''),
+                    line: parseInt(lineNum),
+                    message: message.trim(),
+                    severity: 'error',
+                });
+            }
+            // Warning patterns
+            const warningMatch = line.match(/Warning.*line (\d+)/i);
+            if (warningMatch && currentFile) {
+                errors.push({
+                    file: currentFile,
+                    line: parseInt(warningMatch[1]),
+                    message: line.trim(),
+                    severity: 'warning',
+                });
+            }
+        }
+        return errors;
+    }
+}
+exports.CompileOrchestrator = CompileOrchestrator;
+//# sourceMappingURL=CompileOrchestrator.js.map

@@ -1,0 +1,82 @@
+{
+  "name": "offline-overleaf",
+  "version": "1.0.0",
+  "description": "Fully offline Overleaf-style LaTeX editor",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
+    "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
+    "dev:renderer": "vite",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "package": "electron-builder",
+    "start": "npm run build && electron dist/main/main.js",
+    "quick-start": "node start.js"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.4",
+    "@types/node": "^20.5.0",
+    "@types/react": "^18.2.20",
+    "@types/react-dom": "^18.2.7",
+    "@types/tar": "^6.1.5",
+    "@types/uuid": "^9.0.2",
+    "@vitejs/plugin-react": "^4.0.4",
+    "concurrently": "^8.2.0",
+    "electron": "^25.6.0",
+    "electron-builder": "^24.6.3",
+    "typescript": "^5.1.6",
+    "vite": "^4.4.9"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.6",
+    "@codemirror/commands": "^6.3.0",
+    "@codemirror/fold": "^0.19.4",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.9",
+    "@codemirror/lang-javascript": "^6.2.4",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.3.4",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/language-data": "^6.5.1",
+    "@codemirror/legacy-modes": "^6.5.1",
+    "@codemirror/search": "^6.5.4",
+    "@codemirror/state": "^6.3.0",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.21.0",
+    "@lezer/highlight": "^1.2.1",
+    "@replit/codemirror-vim": "^6.3.0",
+    "autoprefixer": "^10.4.15",
+    "better-sqlite3": "^12.2.0",
+    "chokidar": "^3.6.0",
+    "codemirror": "^6.0.1",
+    "lezer-tex": "^0.0.0-3",
+    "pdfjs-dist": "^3.9.179",
+    "postcss": "^8.4.28",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.3.3",
+    "tar": "^6.2.0",
+    "uuid": "^9.0.0"
+  },
+  "build": {
+    "appId": "com.offline-overleaf.app",
+    "productName": "Offline Overleaf",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
