@@ -77,6 +77,7 @@ export interface ElectronAPI {
         projectId: string;
         engine?: string;
         mainFile?: string;
+        isAutoCompile?: boolean;
     }) => Promise<{
         jobId: string;
     }>;
@@ -92,6 +93,18 @@ export interface ElectronAPI {
         ok: boolean;
     }>;
     compileMock: (payload: {
+        projectId: string;
+    }) => Promise<{
+        ok: boolean;
+    }>;
+    compileQueueState: (payload: {
+        projectId: string;
+    }) => Promise<{
+        pending: number;
+        running: number;
+        maxConcurrency: number;
+    }>;
+    compileTriggerAutoCompile: (payload: {
         projectId: string;
     }) => Promise<{
         ok: boolean;
@@ -125,6 +138,8 @@ export interface ElectronAPI {
     removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
     onFileChanged: (callback: (event: any, data: any) => void) => void;
     removeFileChangedListener: (callback: (event: any, data: any) => void) => void;
+    onQueueStateChange: (callback: (event: any, data: any) => void) => void;
+    removeQueueStateChangeListener: (callback: (event: any, data: any) => void) => void;
 }
 declare global {
     interface Window {

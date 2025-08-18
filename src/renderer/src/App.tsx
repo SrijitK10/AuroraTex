@@ -46,6 +46,14 @@ function App() {
   const [compilationStatus, setCompilationStatus] = useState<'idle' | 'compiling' | 'success' | 'error'>('idle');
   const [showSidebar, setShowSidebar] = useState(true); // Add sidebar toggle state
 
+  // Milestone 5: Queue and auto-compile state
+  const [queueState, setQueueState] = useState<{
+    pending: number;
+    running: number;
+    maxConcurrency: number;
+  } | undefined>(undefined);
+  const [isAutoCompileEnabled, setIsAutoCompileEnabled] = useState(false);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -101,6 +109,12 @@ function App() {
               reloadFile(affectedTab.id, data.path);
             }
           }
+
+          // Milestone 5: Trigger auto-compile on file changes (only if internal change)
+          if (isAutoCompileEnabled && !data.isExternal) {
+            console.log('Auto-compile triggered by file change:', data.path);
+            handleAutoCompile();
+          }
         }
         
         // Handle file deletions
@@ -115,7 +129,7 @@ function App() {
     return () => {
       window.electronAPI.removeFileChangedListener(handleFileChange);
     };
-  }, [currentProject?.id, openTabs]);
+  }, [currentProject?.id, openTabs, isAutoCompileEnabled]);
 
   // Set up compile progress event cleanup on component unmount
   useEffect(() => {
@@ -382,6 +396,26 @@ function App() {
     }
   };
 
+  // Milestone 5: Auto-compile and toggle functions
+  const handleAutoCompile = async () => {
+    if (!currentProject || !isAutoCompileEnabled) return;
+
+    try {
+      // Use type assertion for now until TypeScript interface is updated
+      await (window.electronAPI as any).compileTriggerAutoCompile({
+        projectId: currentProject.id,
+      });
+      console.log('Auto-compile triggered for project:', currentProject.id);
+    } catch (error) {
+      console.error('Failed to trigger auto-compile:', error);
+    }
+  };
+
+  const handleToggleAutoCompile = () => {
+    setIsAutoCompileEnabled(prev => !prev);
+    console.log('Auto-compile mode:', !isAutoCompileEnabled ? 'enabled' : 'disabled');
+  };
+
   const mockCompile = async () => {
     if (!currentProject) return;
 
@@ -449,6 +483,9 @@ function App() {
         showSidebar={showSidebar}
         onToggleSidebar={() => setShowSidebar(!showSidebar)}
         onBack={handleBackToProjects}
+        queueState={queueState}
+        isAutoCompileEnabled={isAutoCompileEnabled}
+        onToggleAutoCompile={handleToggleAutoCompile}
       />
       
       <div className="flex-1 flex">

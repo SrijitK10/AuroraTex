@@ -1,6 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
-
-// Define the API interface
+// Milestone 5: Updated ElectronAPI interface with queue and auto-compile methods
 export interface ElectronAPI {
   // Dialog APIs
   dialogShowOpenDialog: () => Promise<{ canceled: boolean; filePaths?: string[] }>;
@@ -53,62 +51,6 @@ export interface ElectronAPI {
   removeQueueStateChangeListener: (callback: (event: any, data: any) => void) => void;
 }
 
-// Expose the API to the renderer process
-const electronAPI: ElectronAPI = {
-  // Dialog APIs
-  dialogShowOpenDialog: () => ipcRenderer.invoke('Dialog.ShowOpenDialog'),
-
-  // Project APIs
-  projectCreate: (payload) => ipcRenderer.invoke('Project.Create', payload),
-  projectOpen: (payload) => ipcRenderer.invoke('Project.Open', payload),
-  projectList: () => ipcRenderer.invoke('Project.List'),
-  projectSetMain: (payload) => ipcRenderer.invoke('Project.SetMain', payload),
-  projectOutputPath: (payload) => ipcRenderer.invoke('Project.OutputPath', payload),
-
-  // File System APIs
-  fsListTree: (payload) => ipcRenderer.invoke('FS.ListTree', payload),
-  fsReadFile: (payload) => ipcRenderer.invoke('FS.ReadFile', payload),
-  fsWriteFile: (payload) => ipcRenderer.invoke('FS.WriteFile', payload),
-  fsCreateFile: (payload) => ipcRenderer.invoke('FS.CreateFile', payload),
-  fsCreateDir: (payload) => ipcRenderer.invoke('FS.CreateDir', payload),
-  fsRename: (payload) => ipcRenderer.invoke('FS.Rename', payload),
-  fsDelete: (payload) => ipcRenderer.invoke('FS.Delete', payload),
-  fsStartWatching: (payload) => ipcRenderer.invoke('FS.StartWatching', payload),
-  fsStopWatching: (payload) => ipcRenderer.invoke('FS.StopWatching', payload),
-
-  // Compile APIs
-  compileRun: (payload) => ipcRenderer.invoke('Compile.Run', payload),
-  compileStatus: (payload) => ipcRenderer.invoke('Compile.Status', payload),
-  compileErrors: (payload) => ipcRenderer.invoke('Compile.Errors', payload),
-  compileCancel: (payload) => ipcRenderer.invoke('Compile.Cancel', payload),
-  compileMock: (payload) => ipcRenderer.invoke('Compile.Mock', payload),
-  // Milestone 5: Queue and auto-compile APIs
-  compileQueueState: (payload) => ipcRenderer.invoke('Compile.QueueState', payload),
-  compileTriggerAutoCompile: (payload) => ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),
-
-  // Snapshot APIs
-  snapshotCreate: (payload) => ipcRenderer.invoke('Snapshot.Create', payload),
-  snapshotList: (payload) => ipcRenderer.invoke('Snapshot.List', payload),
-  snapshotRestore: (payload) => ipcRenderer.invoke('Snapshot.Restore', payload),
-
-  // Settings APIs
-  settingsGet: (payload) => ipcRenderer.invoke('Settings.Get', payload),
-  settingsSet: (payload) => ipcRenderer.invoke('Settings.Set', payload),
-  settingsCheckTeX: () => ipcRenderer.invoke('Settings.CheckTeX'),
-
-  // Event listeners
-  onCompileProgress: (callback) => ipcRenderer.on('Compile.Progress', callback),
-  removeCompileProgressListener: (callback) => ipcRenderer.removeListener('Compile.Progress', callback),
-  onFileChanged: (callback) => ipcRenderer.on('file-changed', callback),
-  removeFileChangedListener: (callback) => ipcRenderer.removeListener('file-changed', callback),
-  // Milestone 5: Queue state change event listeners
-  onQueueStateChange: (callback) => ipcRenderer.on('Compile.QueueStateChange', callback),
-  removeQueueStateChangeListener: (callback) => ipcRenderer.removeListener('Compile.QueueStateChange', callback),
-};
-
-contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-
-// Declare global interface for TypeScript
 declare global {
   interface Window {
     electronAPI: ElectronAPI;

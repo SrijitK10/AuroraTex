@@ -10,6 +10,14 @@ interface TopbarProps {
   showSidebar: boolean;
   onToggleSidebar: () => void;
   onBack: () => void;
+  // Milestone 5: Queue and compile mode props
+  queueState?: {
+    pending: number;
+    running: number;
+    maxConcurrency: number;
+  };
+  isAutoCompileEnabled?: boolean;
+  onToggleAutoCompile?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -20,7 +28,10 @@ export const Topbar: React.FC<TopbarProps> = ({
   onMockCompile,
   showSidebar,
   onToggleSidebar,
-  onBack
+  onBack,
+  queueState,
+  isAutoCompileEnabled = false,
+  onToggleAutoCompile
 }) => {
   return (
     <div className="topbar">
@@ -47,7 +58,21 @@ export const Topbar: React.FC<TopbarProps> = ({
         />
         
         <h1 className="text-lg font-semibold text-gray-800">{project.name}</h1>
-        {isCompiling && (
+        
+        {/* Milestone 5: Queue state indicator */}
+        {queueState && (queueState.running > 0 || queueState.pending > 0) && (
+          <div className="flex items-center space-x-2 text-blue-600">
+            <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+            <span className="text-sm">
+              {queueState.running > 0 && `Running: ${queueState.running}`}
+              {queueState.running > 0 && queueState.pending > 0 && ', '}
+              {queueState.pending > 0 && `Queued: ${queueState.pending}`}
+            </span>
+          </div>
+        )}
+        
+        {/* Legacy single compile indicator for compatibility */}
+        {isCompiling && (!queueState || (queueState.running === 0 && queueState.pending === 0)) && (
           <div className="flex items-center space-x-2 text-blue-600">
             <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
             <span className="text-sm">Compiling...</span>
@@ -56,6 +81,21 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
       
       <div className="flex items-center space-x-2">
+        {/* Milestone 5: Auto-compile toggle */}
+        {onToggleAutoCompile && (
+          <button
+            onClick={onToggleAutoCompile}
+            className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+              isAutoCompileEnabled
+                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+            }`}
+            title={isAutoCompileEnabled ? 'Auto-compile enabled' : 'Auto-compile disabled'}
+          >
+            {isAutoCompileEnabled ? '🔄 Auto' : '⏸️ Manual'}
+          </button>
+        )}
+        
         {onMockCompile && (
           <button
             onClick={onMockCompile}

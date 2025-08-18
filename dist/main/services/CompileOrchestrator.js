@@ -10,14 +10,119 @@ const os_1 = require("os");
 const events_1 = require("events");
 const ProjectService_1 = require("./ProjectService");
 const SettingsService_1 = require("./SettingsService");
+// Milestone 5: Circular buffer for log storage
+class CircularBuffer {
+    constructor(maxSize = 1000) {
+        this.buffer = [];
+        this.currentIndex = 0;
+        this.isFull = false;
+        this.maxSize = maxSize;
+    }
+    add(item) {
+        this.buffer[this.currentIndex] = item;
+        this.currentIndex = (this.currentIndex + 1) % this.maxSize;
+        if (this.currentIndex === 0) {
+            this.isFull = true;
+        }
+    }
+    getAll() {
+        if (!this.isFull) {
+            return this.buffer.slice(0, this.currentIndex);
+        }
+        return [
+            ...this.buffer.slice(this.currentIndex),
+            ...this.buffer.slice(0, this.currentIndex)
+        ];
+    }
+    clear() {
+        this.buffer = [];
+        this.currentIndex = 0;
+        this.isFull = false;
+    }
+}
 class CompileOrchestrator extends events_1.EventEmitter {
     constructor() {
         super();
         this.jobs = new Map();
         this.queue = [];
         this.running = false;
+        // Milestone 5: Enhanced queue management
+        this.maxConcurrency = 1; // Milestone 5: Concurrency=1 as specified
+        this.currentlyRunning = 0;
+        this.logBuffers = new Map(); // Milestone 5: Circular buffer per job
+        // Milestone 5: Auto-compile debouncing
+        this.autoCompileTimers = new Map(); // projectId -> timer
+        this.lastCompileEnd = new Map(); // projectId -> timestamp
+        this.pendingAutoCompile = new Map(); // projectId -> needsBuild flag
+        this.autoCompileDebounceMs = 3000; // 3 seconds debounce
+        this.autoCompileMinInterval = 5000; // 5 seconds minimum between auto-compiles
         this.projectService = new ProjectService_1.ProjectService();
         this.settingsService = new SettingsService_1.SettingsService();
+    }
+    // Milestone 5: Debounced auto-compile triggered by file saves
+    triggerAutoCompile(projectId) {
+        console.log(`[CompileOrchestrator] Auto-compile triggered for project: ${projectId}`);
+        // Clear existing timer
+        const existingTimer = this.autoCompileTimers.get(projectId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+        // Set new debounced timer
+        const timer = setTimeout(() => {
+            this.handleAutoCompile(projectId);
+            this.autoCompileTimers.delete(projectId);
+        }, this.autoCompileDebounceMs);
+        this.autoCompileTimers.set(projectId, timer);
+    }
+    // Milestone 5: Handle auto-compile with coalescing logic
+    async handleAutoCompile(projectId) {
+        const lastCompileTime = this.lastCompileEnd.get(projectId) || 0;
+        const timeSinceLastCompile = Date.now() - lastCompileTime;
+        // Check if there's already a running job for this project
+        const runningJob = Array.from(this.jobs.values()).find(job => job.projectId === projectId && job.state === 'running');
+        if (runningJob) {
+            // Mark that we need to build again after current job finishes
+            this.pendingAutoCompile.set(projectId, true);
+            console.log(`[CompileOrchestrator] Marking auto-compile as pending for project: ${projectId}`);
+            return;
+        }
+        // Check minimum interval between compiles
+        if (timeSinceLastCompile < this.autoCompileMinInterval) {
+            // Mark as pending and wait
+            this.pendingAutoCompile.set(projectId, true);
+            console.log(`[CompileOrchestrator] Auto-compile too soon, marking as pending for project: ${projectId}`);
+            return;
+        }
+        // Clear pending flag and trigger compile
+        this.pendingAutoCompile.set(projectId, false);
+        try {
+            await this.run(projectId, undefined, undefined, true); // isAutoCompile = true
+            console.log(`[CompileOrchestrator] Auto-compile started for project: ${projectId}`);
+        }
+        catch (error) {
+            console.error(`[CompileOrchestrator] Failed to start auto-compile for project: ${projectId}`, error);
+        }
+    }
+    // Milestone 5: Get overall queue state for UI
+    getQueueState() {
+        const runningJobs = Array.from(this.jobs.values()).filter(job => job.state === 'running');
+        const queuedJobs = Array.from(this.jobs.values()).filter(job => job.state === 'queued');
+        let state = 'idle';
+        if (runningJobs.length > 0) {
+            state = 'building';
+        }
+        else if (queuedJobs.length > 0) {
+            state = 'queued';
+        }
+        return {
+            state,
+            queueLength: queuedJobs.length,
+            currentJobs: runningJobs.map(job => ({
+                jobId: job.id,
+                projectId: job.projectId,
+                isAutoCompile: job.isAutoCompile || false
+            }))
+        };
     }
     async createMockPDF(projectId) {
         const project = await this.projectService.getById(projectId);
@@ -69,7 +174,7 @@ startxref
         const fs = require('fs').promises;
         await fs.writeFile(outputPdf, mockPdfContent, 'binary');
     }
-    async run(projectId, engine, mainFile) {
+    async run(projectId, engine, mainFile, isAutoCompile = false) {
         const project = await this.projectService.getById(projectId);
         if (!project) {
             throw new Error('Project not found');
@@ -82,14 +187,52 @@ startxref
             progress: 0,
             logs: [],
             errors: [],
+            isAutoCompile, // Milestone 5: Track auto vs manual compile
+            priority: isAutoCompile ? 2 : 1, // Milestone 5: Manual jobs have higher priority
         };
         this.jobs.set(jobId, job);
+        // Milestone 5: Sort queue by priority (manual jobs first)
         this.queue.push(jobId);
-        // Start processing queue if not already running
-        if (!this.running) {
+        this.queue.sort((a, b) => {
+            const jobA = this.jobs.get(a);
+            const jobB = this.jobs.get(b);
+            return (jobA?.priority || 3) - (jobB?.priority || 3);
+        });
+        // Milestone 5: Initialize circular buffer for this job
+        this.logBuffers.set(jobId, new CircularBuffer(1000));
+        // Emit queue state change
+        this.emitQueueStateChange();
+        // Start processing queue if under concurrency limit
+        if (this.currentlyRunning < this.maxConcurrency) {
             this.processQueue();
         }
         return { jobId };
+    }
+    // Milestone 5: Emit queue state changes for UI updates
+    // Milestone 5: Write circular buffer logs to file after job completion
+    async writeFullLogFile(job) {
+        try {
+            const project = await this.projectService.getById(job.projectId);
+            if (!project)
+                return;
+            const outputDir = (0, path_1.join)(project.root, 'output');
+            await (0, promises_1.mkdir)(outputDir, { recursive: true });
+            const logFilePath = (0, path_1.join)(outputDir, 'compile.log');
+            // Get all buffered logs for this job
+            const allLogs = job.logs.slice(); // Get all logs from the job's log array
+            if (allLogs.length > 0) {
+                const logContent = allLogs.join('\n');
+                await (0, promises_1.writeFile)(logFilePath, logContent, 'utf8');
+                console.log(`[CompileOrchestrator] Wrote ${allLogs.length} log lines to: ${logFilePath}`);
+            }
+        }
+        catch (error) {
+            console.error('[CompileOrchestrator] Failed to write log file:', error);
+        }
+    }
+    emitQueueStateChange() {
+        const queueState = this.getQueueState();
+        this.emit('queueState', queueState);
     }
     async cancel(jobId) {
         const job = this.jobs.get(jobId);
@@ -133,22 +276,25 @@ startxref
             ...data
         });
     }
+    // Milestone 5: Enhanced queue processing with concurrency control
     async processQueue() {
-        if (this.running || this.queue.length === 0) {
-            return;
-        }
-        this.running = true;
-        while (this.queue.length > 0) {
+        // Process jobs while we have capacity and queued jobs
+        while (this.currentlyRunning < this.maxConcurrency && this.queue.length > 0) {
             const jobId = this.queue.shift();
             const job = this.jobs.get(jobId);
             if (!job || job.state === 'cancelled') {
                 continue;
             }
-            await this.executeJob(job);
+            // Start job execution (don't await - run concurrently)
+            this.executeJob(job).catch(error => {
+                console.error(`[CompileOrchestrator] Job execution failed: ${error}`);
+            });
         }
-        this.running = false;
     }
     async executeJob(job) {
+        // Milestone 5: Track concurrency
+        this.currentlyRunning++;
+        this.emitQueueStateChange();
         try {
             job.state = 'running';
             job.startTime = new Date();
@@ -197,7 +343,7 @@ startxref
             console.log(`[CompileOrchestrator] Build directory: ${buildDir}`);
             console.log(`[CompileOrchestrator] Main file: ${project.mainFile}`);
             await this.runLatexmk(job, latexmkPath, buildDir, project.mainFile, engine);
-            // Copy output back to project (Milestone 4: move main.pdf to project/output/main.pdf)
+            // Milestone 5: Copy output back to project (only main.pdf + compile.log)
             const outputDir = (0, path_1.join)(project.root, 'output');
             await (0, promises_1.mkdir)(outputDir, { recursive: true });
             // Always copy compile.log (Milestone 4: keep compile.log on error)
@@ -235,6 +381,23 @@ startxref
                 state: 'error',
                 message: errorMessage
             });
+        }
+        finally {
+            // Milestone 5: Post-job cleanup and auto-compile handling
+            this.currentlyRunning--;
+            this.lastCompileEnd.set(job.projectId, Date.now());
+            // Milestone 5: Write full log file at end
+            await this.writeFullLogFile(job);
+            // Check for pending auto-compile
+            if (this.pendingAutoCompile.get(job.projectId)) {
+                console.log(`[CompileOrchestrator] Checking pending auto-compile for project: ${job.projectId}`);
+                setTimeout(() => {
+                    this.handleAutoCompile(job.projectId);
+                }, 1000); // Brief delay to allow for UI updates
+            }
+            this.emitQueueStateChange();
+            // Continue processing queue
+            this.processQueue();
         }
     }
     async copyProjectFiles(sourceDir, destDir) {
@@ -290,7 +453,7 @@ startxref
             });
             job.process = childProcess;
             let logBuffer = '';
-            // Milestone 4: Capture stdout/stderr line-by-line to a rolling log
+            // Milestone 5: Use circular buffer for efficient log management
             childProcess.stdout.on('data', (data) => {
                 const text = data.toString();
                 logBuffer += text;
@@ -298,15 +461,16 @@ startxref
                 const lines = text.split('\n');
                 lines.forEach(line => {
                     if (line.trim()) {
-                        job.logs.push(line);
+                        job.logs.push(line); // Store in job logs
+                        this.logBuffers.get(job.projectId)?.add(line); // Also add to circular buffer
                         // Emit live log lines (Milestone 4)
                         this.emitProgress(job.id, {
                             line: line,
-                            percent: Math.min(90, job.progress + 5)
+                            percent: Math.min(90, job.progress + 2) // Milestone 5: smoother progress
                         });
                     }
                 });
-                job.progress = Math.min(90, job.progress + 5);
+                job.progress = Math.min(90, job.progress + 2); // Milestone 5: smoother increments
             });
             childProcess.stderr.on('data', (data) => {
                 const text = data.toString();
@@ -316,7 +480,8 @@ startxref
                 lines.forEach(line => {
                     if (line.trim()) {
                         const logLine = `STDERR: ${line}`;
-                        job.logs.push(logLine);
+                        job.logs.push(logLine); // Store in job logs
+                        this.logBuffers.get(job.projectId)?.add(logLine); // Also add to circular buffer
                         // Emit live log lines for stderr too
                         this.emitProgress(job.id, {
                             line: logLine

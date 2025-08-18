@@ -27,6 +27,9 @@ const electronAPI = {
     compileErrors: (payload) => electron_1.ipcRenderer.invoke('Compile.Errors', payload),
     compileCancel: (payload) => electron_1.ipcRenderer.invoke('Compile.Cancel', payload),
     compileMock: (payload) => electron_1.ipcRenderer.invoke('Compile.Mock', payload),
+    // Milestone 5: Queue and auto-compile APIs
+    compileQueueState: (payload) => electron_1.ipcRenderer.invoke('Compile.QueueState', payload),
+    compileTriggerAutoCompile: (payload) => electron_1.ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),
     // Snapshot APIs
     snapshotCreate: (payload) => electron_1.ipcRenderer.invoke('Snapshot.Create', payload),
     snapshotList: (payload) => electron_1.ipcRenderer.invoke('Snapshot.List', payload),
@@ -40,6 +43,9 @@ const electronAPI = {
     removeCompileProgressListener: (callback) => electron_1.ipcRenderer.removeListener('Compile.Progress', callback),
     onFileChanged: (callback) => electron_1.ipcRenderer.on('file-changed', callback),
     removeFileChangedListener: (callback) => electron_1.ipcRenderer.removeListener('file-changed', callback),
+    // Milestone 5: Queue state change event listeners
+    onQueueStateChange: (callback) => electron_1.ipcRenderer.on('Compile.QueueStateChange', callback),
+    removeQueueStateChangeListener: (callback) => electron_1.ipcRenderer.removeListener('Compile.QueueStateChange', callback),
 };
 electron_1.contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 //# sourceMappingURL=preload.js.map

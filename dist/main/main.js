@@ -124,7 +124,7 @@ class App {
         });
         // Compile IPC handlers
         electron_1.ipcMain.handle('Compile.Run', async (_, payload) => {
-            return await this.compileOrchestrator.run(payload.projectId, payload.engine, payload.mainFile);
+            return await this.compileOrchestrator.run(payload.projectId, payload.engine, payload.mainFile, payload.isAutoCompile);
         });
         electron_1.ipcMain.handle('Compile.Status', async (_, payload) => {
             return this.compileOrchestrator.getStatus(payload.jobId);
@@ -135,10 +135,23 @@ class App {
         electron_1.ipcMain.handle('Compile.Cancel', async (_, payload) => {
             return this.compileOrchestrator.cancel(payload.jobId);
         });
+        // Milestone 5: Queue state and auto-compile handlers
+        electron_1.ipcMain.handle('Compile.QueueState', async (_, payload) => {
+            return this.compileOrchestrator.getQueueState();
+        });
+        electron_1.ipcMain.handle('Compile.TriggerAutoCompile', async (_, payload) => {
+            return this.compileOrchestrator.triggerAutoCompile(payload.projectId);
+        });
         // Setup compile progress events (Milestone 4)
         this.compileOrchestrator.on('progress', (data) => {
             if (this.mainWindow) {
                 this.mainWindow.webContents.send('Compile.Progress', data);
+            }
+        });
+        // Milestone 5: Setup queue state change events
+        this.compileOrchestrator.on('queueStateChange', (data) => {
+            if (this.mainWindow) {
+                this.mainWindow.webContents.send('Compile.QueueStateChange', data);
             }
         });
         // Mock compile for testing (Milestone 3)
