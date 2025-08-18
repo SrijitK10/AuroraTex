@@ -110,8 +110,12 @@ function App() {
             }
           }
 
-          // Milestone 5: Trigger auto-compile on file changes (only if internal change)
-          if (isAutoCompileEnabled && !data.isExternal) {
+          // Milestone 5: Trigger auto-compile on file changes (only if not external and is .tex file)
+          if (isAutoCompileEnabled && data.path.endsWith('.tex')) {
+            console.log('Auto-compile check - path:', data.path, 'isExternal:', data.isExternal, 'enabled:', isAutoCompileEnabled);
+            
+            // Trigger auto-compile for any .tex file changes when enabled
+            // For now, trigger on any .tex file change since we want to test the functionality
             console.log('Auto-compile triggered by file change:', data.path);
             handleAutoCompile();
           }
@@ -398,22 +402,73 @@ function App() {
 
   // Milestone 5: Auto-compile and toggle functions
   const handleAutoCompile = async () => {
-    if (!currentProject || !isAutoCompileEnabled) return;
-
-    try {
-      // Use type assertion for now until TypeScript interface is updated
-      await (window.electronAPI as any).compileTriggerAutoCompile({
-        projectId: currentProject.id,
+    if (!currentProject || !isAutoCompileEnabled || isCompiling) {
+      console.log('Auto-compile skipped:', { 
+        hasProject: !!currentProject, 
+        enabled: isAutoCompileEnabled, 
+        isCompiling 
       });
-      console.log('Auto-compile triggered for project:', currentProject.id);
+      return;
+    }
+
+    console.log('Auto-compile triggered for project:', currentProject.id);
+    
+    try {
+      // Use the regular compile function but mark it as auto-compile
+      setIsCompiling(true);
+      setCompilationStatus('compiling');
+      // Note: Don't automatically open log panel for auto-compiles to be less disruptive
+      
+      const result = await window.electronAPI.compileRun({
+        projectId: currentProject.id,
+        isAutoCompile: true as any, // Auto-compile flag
+      } as any);
+
+      console.log('Auto-compile job started:', result.jobId);
+
+      // Listen for progress (same as manual compile)
+      const handleProgress = (event: any, data: any) => {
+        if (data.jobId === result.jobId) {
+          if (data.line) {
+            setLogs(prev => [...prev, data.line]);
+          }
+          
+          if (data.state === 'success') {
+            setIsCompiling(false);
+            setCompilationStatus('success');
+            console.log('✅ Auto-compilation successful - refreshing PDF');
+            setPdfRefreshTrigger(prev => prev + 1);
+            window.electronAPI.removeCompileProgressListener(handleProgress);
+          } else if (data.state === 'error' || data.state === 'killed') {
+            setIsCompiling(false);
+            setCompilationStatus('error');
+            console.log('❌ Auto-compilation failed');
+            window.electronAPI.removeCompileProgressListener(handleProgress);
+          }
+        }
+      };
+
+      window.electronAPI.onCompileProgress(handleProgress);
+      
     } catch (error) {
       console.error('Failed to trigger auto-compile:', error);
+      setIsCompiling(false);
+      setCompilationStatus('error');
     }
   };
 
   const handleToggleAutoCompile = () => {
-    setIsAutoCompileEnabled(prev => !prev);
-    console.log('Auto-compile mode:', !isAutoCompileEnabled ? 'enabled' : 'disabled');
+    const newState = !isAutoCompileEnabled;
+    setIsAutoCompileEnabled(newState);
+    console.log('Auto-compile mode:', newState ? 'enabled' : 'disabled');
+    
+    // If enabling auto-compile, trigger an immediate compilation to test
+    if (newState && currentProject) {
+      console.log('Auto-compile enabled - triggering immediate test compilation');
+      setTimeout(() => {
+        handleAutoCompile();
+      }, 100); // Small delay to ensure state is updated
+    }
   };
 
   const mockCompile = async () => {
