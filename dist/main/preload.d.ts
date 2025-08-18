@@ -140,6 +140,36 @@ export interface ElectronAPI {
         found: boolean;
         paths: any;
     }>;
+    templateList: () => Promise<any[]>;
+    templateApply: (payload: {
+        projectId: string;
+        templateId: string;
+        projectRoot: string;
+    }) => Promise<{
+        ok: boolean;
+    }>;
+    snippetList: () => Promise<any[]>;
+    snippetSearch: (payload: {
+        query: string;
+    }) => Promise<any[]>;
+    snippetGetByCategory: (payload: {
+        category: string;
+    }) => Promise<any[]>;
+    bibTexParse: (payload: {
+        projectId: string;
+        fileName: string;
+    }) => Promise<any[]>;
+    bibTexWrite: (payload: {
+        projectId: string;
+        fileName: string;
+        entries: any[];
+    }) => Promise<{
+        ok: boolean;
+    }>;
+    bibTexCreateEntry: (payload: {
+        type: string;
+    }) => Promise<any>;
+    bibTexGetEntryTypes: () => Promise<any[]>;
     onCompileProgress: (callback: (event: any, data: any) => void) => void;
     removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
     onFileChanged: (callback: (event: any, data: any) => void) => void;

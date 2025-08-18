@@ -25,6 +25,9 @@ interface TopbarProps {
   // Milestone 7: History panel props
   showHistoryPanel?: boolean;
   onToggleHistoryPanel?: () => void;
+  // Milestone 8: Templates, snippets, and bibliography props
+  onOpenSnippets?: () => void;
+  onOpenBibliography?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -43,7 +46,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleErrorsPanel,
   errorCount = 0,
   showHistoryPanel = false,
-  onToggleHistoryPanel
+  onToggleHistoryPanel,
+  onOpenSnippets,
+  onOpenBibliography
 }) => {
   return (
     <div className="topbar">
@@ -108,6 +113,38 @@ export const Topbar: React.FC<TopbarProps> = ({
             title={isAutoCompileEnabled ? 'Auto-compile enabled' : 'Auto-compile disabled'}
           >
             {isAutoCompileEnabled ? '🔄 Auto' : '⏸️ Manual'}
+          </button>
+        )}
+        
+        {/* Milestone 8: Snippets Palette */}
+        {onOpenSnippets && (
+          <button
+            onClick={onOpenSnippets}
+            className="px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            title="Open snippets palette (Ctrl+Space)"
+          >
+            <div className="flex items-center space-x-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+              <span>Snippets</span>
+            </div>
+          </button>
+        )}
+        
+        {/* Milestone 8: Bibliography Manager */}
+        {onOpenBibliography && (
+          <button
+            onClick={onOpenBibliography}
+            className="px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            title="Open bibliography manager"
+          >
+            <div className="flex items-center space-x-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.832 18.477 19.246 18 17.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              <span>Bibliography</span>
+            </div>
           </button>
         )}
         

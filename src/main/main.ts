@@ -6,6 +6,9 @@ import { ProjectService } from './services/ProjectService';
 import { SettingsService } from './services/SettingsService';
 import { CompileOrchestrator } from './services/CompileOrchestrator';
 import { SnapshotService } from './services/SnapshotService';
+import { TemplateService } from './services/TemplateService';
+import { SnippetService } from './services/SnippetService';
+import { BibTeXService } from './services/BibTeXService';
 
 class App {
   private mainWindow: BrowserWindow | null = null;
@@ -14,6 +17,9 @@ class App {
   private settingsService: SettingsService;
   private compileOrchestrator: CompileOrchestrator;
   private snapshotService: SnapshotService;
+  private templateService: TemplateService;
+  private snippetService: SnippetService;
+  private bibTexService: BibTeXService;
 
   constructor() {
     this.fileService = new FileService();
@@ -21,6 +27,9 @@ class App {
     this.settingsService = new SettingsService();
     this.compileOrchestrator = new CompileOrchestrator();
     this.snapshotService = new SnapshotService(this.projectService);
+    this.templateService = new TemplateService();
+    this.snippetService = new SnippetService();
+    this.bibTexService = new BibTeXService();
   }
 
   async initialize() {
@@ -29,6 +38,8 @@ class App {
     // Initialize services
     await this.projectService.initialize();
     await this.settingsService.initialize();
+    await this.templateService.initialize();
+    await this.snippetService.initialize();
     
     this.createWindow();
     this.setupIPC();
@@ -219,6 +230,49 @@ class App {
 
     ipcMain.handle('Snapshot.Delete', async (_, payload) => {
       return await this.snapshotService.delete(payload.snapshotId);
+    });
+
+    // Template IPC handlers
+    ipcMain.handle('Template.List', async () => {
+      return await this.templateService.list();
+    });
+
+    ipcMain.handle('Template.Apply', async (_, payload) => {
+      return await this.templateService.apply(payload.projectId, payload.templateId, payload.projectRoot);
+    });
+
+    // Snippet IPC handlers
+    ipcMain.handle('Snippet.List', async () => {
+      return await this.snippetService.list();
+    });
+
+    ipcMain.handle('Snippet.Search', async (_, payload) => {
+      return await this.snippetService.search(payload.query);
+    });
+
+    ipcMain.handle('Snippet.GetByCategory', async (_, payload) => {
+      return await this.snippetService.getByCategory(payload.category);
+    });
+
+    // BibTeX IPC handlers
+    ipcMain.handle('BibTeX.Parse', async (_, payload) => {
+      const project = await this.projectService.getById(payload.projectId);
+      if (!project) throw new Error('Project not found');
+      return await this.bibTexService.parseBibFile(project.root, payload.fileName);
+    });
+
+    ipcMain.handle('BibTeX.Write', async (_, payload) => {
+      const project = await this.projectService.getById(payload.projectId);
+      if (!project) throw new Error('Project not found');
+      return await this.bibTexService.writeBibFile(project.root, payload.fileName, payload.entries);
+    });
+
+    ipcMain.handle('BibTeX.CreateEntry', async (_, payload) => {
+      return this.bibTexService.createNewEntry(payload.type);
+    });
+
+    ipcMain.handle('BibTeX.GetEntryTypes', async () => {
+      return this.bibTexService.getEntryTypes();
     });
 
     // Settings IPC handlers

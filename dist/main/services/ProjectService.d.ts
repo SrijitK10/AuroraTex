@@ -1,5 +1,6 @@
 import { ProjectDTO } from '../types';
 export declare class ProjectService {
+    private templateService;
     constructor();
     initialize(): Promise<void>;
     create(name: string, path?: string, templateId?: string): Promise<ProjectDTO>;

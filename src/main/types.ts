@@ -62,3 +62,20 @@ export interface TemplateDTO {
     content: string;
   }>;
 }
+
+export interface SnippetDTO {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  trigger: string;
+  content: string;
+  cursorPosition?: number;
+}
+
+export interface BibEntryDTO {
+  id: string;
+  type: string;
+  key: string;
+  fields: Record<string, string>;
+}

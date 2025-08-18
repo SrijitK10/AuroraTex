@@ -39,6 +39,18 @@ const electronAPI = {
     settingsGet: (payload) => electron_1.ipcRenderer.invoke('Settings.Get', payload),
     settingsSet: (payload) => electron_1.ipcRenderer.invoke('Settings.Set', payload),
     settingsCheckTeX: () => electron_1.ipcRenderer.invoke('Settings.CheckTeX'),
+    // Template APIs
+    templateList: () => electron_1.ipcRenderer.invoke('Template.List'),
+    templateApply: (payload) => electron_1.ipcRenderer.invoke('Template.Apply', payload),
+    // Snippet APIs
+    snippetList: () => electron_1.ipcRenderer.invoke('Snippet.List'),
+    snippetSearch: (payload) => electron_1.ipcRenderer.invoke('Snippet.Search', payload),
+    snippetGetByCategory: (payload) => electron_1.ipcRenderer.invoke('Snippet.GetByCategory', payload),
+    // BibTeX APIs
+    bibTexParse: (payload) => electron_1.ipcRenderer.invoke('BibTeX.Parse', payload),
+    bibTexWrite: (payload) => electron_1.ipcRenderer.invoke('BibTeX.Write', payload),
+    bibTexCreateEntry: (payload) => electron_1.ipcRenderer.invoke('BibTeX.CreateEntry', payload),
+    bibTexGetEntryTypes: () => electron_1.ipcRenderer.invoke('BibTeX.GetEntryTypes'),
     // Event listeners
     onCompileProgress: (callback) => electron_1.ipcRenderer.on('Compile.Progress', callback),
     removeCompileProgressListener: (callback) => electron_1.ipcRenderer.removeListener('Compile.Progress', callback),

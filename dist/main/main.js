@@ -8,6 +8,9 @@ const ProjectService_1 = require("./services/ProjectService");
 const SettingsService_1 = require("./services/SettingsService");
 const CompileOrchestrator_1 = require("./services/CompileOrchestrator");
 const SnapshotService_1 = require("./services/SnapshotService");
+const TemplateService_1 = require("./services/TemplateService");
+const SnippetService_1 = require("./services/SnippetService");
+const BibTeXService_1 = require("./services/BibTeXService");
 class App {
     constructor() {
         this.mainWindow = null;
@@ -16,12 +19,17 @@ class App {
         this.settingsService = new SettingsService_1.SettingsService();
         this.compileOrchestrator = new CompileOrchestrator_1.CompileOrchestrator();
         this.snapshotService = new SnapshotService_1.SnapshotService(this.projectService);
+        this.templateService = new TemplateService_1.TemplateService();
+        this.snippetService = new SnippetService_1.SnippetService();
+        this.bibTexService = new BibTeXService_1.BibTeXService();
     }
     async initialize() {
         await electron_1.app.whenReady();
         // Initialize services
         await this.projectService.initialize();
         await this.settingsService.initialize();
+        await this.templateService.initialize();
+        await this.snippetService.initialize();
         this.createWindow();
         this.setupIPC();
         this.setupProtocolHandlers();
@@ -180,6 +188,42 @@ class App {
         });
         electron_1.ipcMain.handle('Snapshot.Delete', async (_, payload) => {
             return await this.snapshotService.delete(payload.snapshotId);
+        });
+        // Template IPC handlers
+        electron_1.ipcMain.handle('Template.List', async () => {
+            return await this.templateService.list();
+        });
+        electron_1.ipcMain.handle('Template.Apply', async (_, payload) => {
+            return await this.templateService.apply(payload.projectId, payload.templateId, payload.projectRoot);
+        });
+        // Snippet IPC handlers
+        electron_1.ipcMain.handle('Snippet.List', async () => {
+            return await this.snippetService.list();
+        });
+        electron_1.ipcMain.handle('Snippet.Search', async (_, payload) => {
+            return await this.snippetService.search(payload.query);
+        });
+        electron_1.ipcMain.handle('Snippet.GetByCategory', async (_, payload) => {
+            return await this.snippetService.getByCategory(payload.category);
+        });
+        // BibTeX IPC handlers
+        electron_1.ipcMain.handle('BibTeX.Parse', async (_, payload) => {
+            const project = await this.projectService.getById(payload.projectId);
+            if (!project)
+                throw new Error('Project not found');
+            return await this.bibTexService.parseBibFile(project.root, payload.fileName);
+        });
+        electron_1.ipcMain.handle('BibTeX.Write', async (_, payload) => {
+            const project = await this.projectService.getById(payload.projectId);
+            if (!project)
+                throw new Error('Project not found');
+            return await this.bibTexService.writeBibFile(project.root, payload.fileName, payload.entries);
+        });
+        electron_1.ipcMain.handle('BibTeX.CreateEntry', async (_, payload) => {
+            return this.bibTexService.createNewEntry(payload.type);
+        });
+        electron_1.ipcMain.handle('BibTeX.GetEntryTypes', async () => {
+            return this.bibTexService.getEntryTypes();
         });
         // Settings IPC handlers
         electron_1.ipcMain.handle('Settings.Get', async (_, payload) => {

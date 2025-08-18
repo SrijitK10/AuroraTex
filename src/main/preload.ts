@@ -45,6 +45,21 @@ export interface ElectronAPI {
   settingsSet: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>;
   settingsCheckTeX: () => Promise<{ found: boolean; paths: any }>;
 
+  // Template APIs
+  templateList: () => Promise<any[]>;
+  templateApply: (payload: { projectId: string; templateId: string; projectRoot: string }) => Promise<{ ok: boolean }>;
+
+  // Snippet APIs
+  snippetList: () => Promise<any[]>;
+  snippetSearch: (payload: { query: string }) => Promise<any[]>;
+  snippetGetByCategory: (payload: { category: string }) => Promise<any[]>;
+
+  // BibTeX APIs
+  bibTexParse: (payload: { projectId: string; fileName: string }) => Promise<any[]>;
+  bibTexWrite: (payload: { projectId: string; fileName: string; entries: any[] }) => Promise<{ ok: boolean }>;
+  bibTexCreateEntry: (payload: { type: string }) => Promise<any>;
+  bibTexGetEntryTypes: () => Promise<any[]>;
+
   // Event listeners
   onCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
@@ -98,6 +113,21 @@ const electronAPI: ElectronAPI = {
   settingsGet: (payload) => ipcRenderer.invoke('Settings.Get', payload),
   settingsSet: (payload) => ipcRenderer.invoke('Settings.Set', payload),
   settingsCheckTeX: () => ipcRenderer.invoke('Settings.CheckTeX'),
+
+  // Template APIs
+  templateList: () => ipcRenderer.invoke('Template.List'),
+  templateApply: (payload) => ipcRenderer.invoke('Template.Apply', payload),
+
+  // Snippet APIs
+  snippetList: () => ipcRenderer.invoke('Snippet.List'),
+  snippetSearch: (payload) => ipcRenderer.invoke('Snippet.Search', payload),
+  snippetGetByCategory: (payload) => ipcRenderer.invoke('Snippet.GetByCategory', payload),
+
+  // BibTeX APIs
+  bibTexParse: (payload) => ipcRenderer.invoke('BibTeX.Parse', payload),
+  bibTexWrite: (payload) => ipcRenderer.invoke('BibTeX.Write', payload),
+  bibTexCreateEntry: (payload) => ipcRenderer.invoke('BibTeX.CreateEntry', payload),
+  bibTexGetEntryTypes: () => ipcRenderer.invoke('BibTeX.GetEntryTypes'),
 
   // Event listeners
   onCompileProgress: (callback) => ipcRenderer.on('Compile.Progress', callback),

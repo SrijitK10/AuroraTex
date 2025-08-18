@@ -33,6 +33,7 @@ interface ErrorMarker {
 // Interface for methods exposed via ref
 export interface EditorRef {
   gotoLine: (line: number) => void;
+  insertText: (text: string, cursorPosition?: number) => void;
 }
 
 interface EditorProps {
@@ -141,7 +142,8 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
     const theme = isDarkMode ? oneDark : [];
     const vimKeymap = isVimMode ? vim() : [];
     
-    return [
+    // Base extensions
+    const extensions = [
       basicSetup,
       languageCompartment.current.of(language),
       themeCompartment.current.of(theme),
@@ -151,6 +153,22 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
       highlightSelectionMatches(),
       // Milestone 6: Error highlighting support
       errorHighlighting(),
+    ];
+    
+    // Add autocomplete for LaTeX files (with error handling)
+    if (isLatexFile(filename)) {
+      try {
+        const autocompleteExt = latexAutocompletion();
+        if (autocompleteExt) {
+          extensions.push(autocompleteExt);
+        }
+      } catch (error) {
+        console.error('Failed to initialize LaTeX autocomplete, continuing without it:', error);
+      }
+    }
+    
+    // Add remaining extensions
+    extensions.push(
       keymap.of([
         indentWithTab,
         ...defaultKeymap,
@@ -185,8 +203,10 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
         '.cm-focused': {
           outline: 'none',
         },
-      }),
-    ];
+      })
+    );
+    
+    return extensions;
   }, [activeTabId, isDarkMode, isVimMode, debouncedSave, onContentChange]);
 
   // Initialize editor
@@ -338,10 +358,36 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
     }
   }, [activeTab]);
 
-  // Expose gotoLine function via ref
+  const insertText = useCallback((text: string, cursorPosition?: number) => {
+    if (viewRef.current && activeTab) {
+      try {
+        const view = viewRef.current;
+        const selection = view.state.selection.main;
+        
+        // Insert the text at the current cursor position
+        view.dispatch({
+          changes: {
+            from: selection.from,
+            to: selection.to,
+            insert: text
+          },
+          selection: cursorPosition !== undefined 
+            ? { anchor: selection.from + cursorPosition, head: selection.from + cursorPosition }
+            : { anchor: selection.from + text.length, head: selection.from + text.length }
+        });
+        
+        view.focus();
+      } catch (error) {
+        console.warn('Could not insert text:', error);
+      }
+    }
+  }, [activeTab]);
+
+  // Expose functions via ref
   useImperativeHandle(ref, () => ({
-    gotoLine
-  }), [gotoLine]);
+    gotoLine,
+    insertText
+  }), [gotoLine, insertText]);
 
   if (tabs.length === 0) {
     return (

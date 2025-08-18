@@ -39,6 +39,21 @@ export interface ElectronAPI {
   settingsSet: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>;
   settingsCheckTeX: () => Promise<{ found: boolean; paths: any }>;
 
+  // Template APIs
+  templateList: () => Promise<any[]>;
+  templateApply: (payload: { projectId: string; templateId: string; projectRoot: string }) => Promise<{ ok: boolean }>;
+
+  // Snippet APIs
+  snippetList: () => Promise<any[]>;
+  snippetSearch: (payload: { query: string }) => Promise<any[]>;
+  snippetGetByCategory: (payload: { category: string }) => Promise<any[]>;
+
+  // BibTeX APIs
+  bibTexParse: (payload: { projectId: string; fileName: string }) => Promise<any[]>;
+  bibTexWrite: (payload: { projectId: string; fileName: string; entries: any[] }) => Promise<{ ok: boolean }>;
+  bibTexCreateEntry: (payload: { type: string }) => Promise<any>;
+  bibTexGetEntryTypes: () => Promise<any[]>;
+
   // Event listeners
   onCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;

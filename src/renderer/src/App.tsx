@@ -6,6 +6,8 @@ import { PDFViewer } from './components/PDFViewer';
 import { LogPanel } from './components/LogPanel';
 import { ErrorsPanel } from './components/ErrorsPanel';
 import { HistoryPanel } from './components/HistoryPanel';
+import { SnippetsPalette } from './components/SnippetsPalette';
+import { BibManager } from './components/BibManager';
 import { Topbar } from './components/Topbar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
@@ -88,6 +90,12 @@ function App() {
   const [lastSnapshotTime, setLastSnapshotTime] = useState<number | null>(null);
   const [periodicSnapshotTimer, setPeriodicSnapshotTimer] = useState<NodeJS.Timeout | null>(null);
 
+  // Milestone 8: Templates, snippets, and bibliography state
+  const [showSnippetsPalette, setShowSnippetsPalette] = useState(false);
+  const [showBibManager, setShowBibManager] = useState(false);
+  const [selectedBibFile, setSelectedBibFile] = useState<string>('references.bib');
+  const [managedFiles, setManagedFiles] = useState<Set<string>>(new Set()); // Files being managed by editors
+
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
 
@@ -98,6 +106,12 @@ function App() {
       if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
         event.preventDefault();
         setShowSidebar(prev => !prev);
+      }
+      
+      // Ctrl+Space to open snippets palette
+      if (event.ctrlKey && event.code === 'Space') {
+        event.preventDefault();
+        setShowSnippetsPalette(true);
       }
       
       // Escape key to go back to projects (only if no modal is open)
@@ -150,14 +164,21 @@ function App() {
         // Handle file changes for open tabs
         if (data.type === 'change' && !data.path.includes('.tmp') && !isRestoringSnapshot) {
           const affectedTab = openTabs.find(tab => tab.path === data.path);
-          if (affectedTab && !affectedTab.isDirty) {
-            // File changed externally and tab is not dirty, offer to reload
+          
+          // Check if this file is currently being managed by an editor (e.g., BibManager)
+          const isFileManaged = managedFiles.has(data.path);
+          
+          if (affectedTab && !affectedTab.isDirty && !isFileManaged) {
+            // Only show reload dialog for files that aren't being managed by specialized editors
             const shouldReload = window.confirm(
               `The file "${data.path}" has been modified externally. Would you like to reload it?`
             );
             if (shouldReload) {
               reloadFile(affectedTab.id, data.path);
             }
+          } else if (affectedTab && !affectedTab.isDirty && isFileManaged) {
+            // Silently reload files that are being managed by specialized editors
+            reloadFile(affectedTab.id, data.path);
           }
 
           // Milestone 5: Trigger auto-compile on file changes (only if not external and is .tex file)
@@ -806,6 +827,35 @@ function App() {
     setCurrentProject(newProject);
   };
 
+  // Milestone 8: Handler functions for templates, snippets, and bibliography
+  const handleInsertSnippet = (content: string, cursorPosition?: number) => {
+    if (editorRef.current) {
+      editorRef.current.insertText(content, cursorPosition);
+    }
+  };
+
+  const handleOpenBibliography = () => {
+    // Auto-detect .bib files in the project or use default
+    const bibFiles = fileTree.filter(file => file.name.endsWith('.bib'));
+    const defaultBibFile = bibFiles.length > 0 ? bibFiles[0].name : 'references.bib';
+    setSelectedBibFile(defaultBibFile);
+    
+    // Track this file as being managed
+    setManagedFiles(prev => new Set(prev).add(defaultBibFile));
+    
+    setShowBibManager(true);
+  };
+
+  const handleCloseBibManager = () => {
+    // Remove the file from managed files when closing
+    setManagedFiles(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(selectedBibFile);
+      return newSet;
+    });
+    setShowBibManager(false);
+  };
+
   if (!currentProject) {
     return <ProjectExplorer onProjectSelect={handleProjectSelect} />;
   }
@@ -829,6 +879,8 @@ function App() {
         errorCount={errors.length}
         showHistoryPanel={showHistoryPanel}
         onToggleHistoryPanel={() => setShowHistoryPanel(!showHistoryPanel)}
+        onOpenSnippets={() => setShowSnippetsPalette(true)}
+        onOpenBibliography={handleOpenBibliography}
       />
       
       <div className="flex-1 flex">
@@ -922,6 +974,23 @@ function App() {
           loadFileTree();
         }}
       />
+
+      {/* Milestone 8: Snippets Palette */}
+      <SnippetsPalette
+        isOpen={showSnippetsPalette}
+        onClose={() => setShowSnippetsPalette(false)}
+        onInsertSnippet={handleInsertSnippet}
+      />
+
+      {/* Milestone 8: Bibliography Manager */}
+      {currentProject && (
+        <BibManager
+          projectId={currentProject.id}
+          fileName={selectedBibFile}
+          isOpen={showBibManager}
+          onClose={handleCloseBibManager}
+        />
+      )}
     </div>
   );
 }

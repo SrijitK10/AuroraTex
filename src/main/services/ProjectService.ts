@@ -5,11 +5,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { homedir } from 'os';
 import { ProjectDTO, ProjectSettings } from '../types';
 import { inMemoryDB } from './InMemoryDB';
+import { TemplateService } from './TemplateService';
 
 export class ProjectService {
+  private templateService: TemplateService;
+
   constructor() {
     // Initialize defaults
     inMemoryDB.initializeDefaults();
+    this.templateService = new TemplateService();
   }
 
   async initialize() {
@@ -40,8 +44,15 @@ export class ProjectService {
       await mkdir(outputDir, { recursive: true });
     }
 
-    // Create default main.tex file
-    const defaultMainContent = `\\documentclass{article}
+    // Apply template if specified
+    if (templateId) {
+      const templateResult = await this.templateService.apply('', templateId, projectRoot);
+      if (!templateResult.ok) {
+        throw new Error('Failed to apply template');
+      }
+    } else {
+      // Create default main.tex file only if no template is applied
+      const defaultMainContent = `\\documentclass{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage{amsmath}
 \\usepackage{amsfonts}
@@ -61,7 +72,8 @@ Welcome to your new LaTeX document!
 
 \\end{document}`;
 
-    await writeFile(join(projectRoot, mainFile), defaultMainContent);
+      await writeFile(join(projectRoot, mainFile), defaultMainContent);
+    }
 
     // Create project.json
     const projectConfig = {

@@ -7,10 +7,12 @@ const fs_1 = require("fs");
 const uuid_1 = require("uuid");
 const os_1 = require("os");
 const InMemoryDB_1 = require("./InMemoryDB");
+const TemplateService_1 = require("./TemplateService");
 class ProjectService {
     constructor() {
         // Initialize defaults
         InMemoryDB_1.inMemoryDB.initializeDefaults();
+        this.templateService = new TemplateService_1.TemplateService();
     }
     async initialize() {
         // No database initialization needed for in-memory storage
@@ -35,8 +37,16 @@ class ProjectService {
         if (!(0, fs_1.existsSync)(outputDir)) {
             await (0, promises_1.mkdir)(outputDir, { recursive: true });
         }
-        // Create default main.tex file
-        const defaultMainContent = `\\documentclass{article}
+        // Apply template if specified
+        if (templateId) {
+            const templateResult = await this.templateService.apply('', templateId, projectRoot);
+            if (!templateResult.ok) {
+                throw new Error('Failed to apply template');
+            }
+        }
+        else {
+            // Create default main.tex file only if no template is applied
+            const defaultMainContent = `\\documentclass{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage{amsmath}
 \\usepackage{amsfonts}
@@ -55,7 +65,8 @@ class ProjectService {
 Welcome to your new LaTeX document!
 
 \\end{document}`;
-        await (0, promises_1.writeFile)((0, path_1.join)(projectRoot, mainFile), defaultMainContent);
+            await (0, promises_1.writeFile)((0, path_1.join)(projectRoot, mainFile), defaultMainContent);
+        }
         // Create project.json
         const projectConfig = {
             id,
