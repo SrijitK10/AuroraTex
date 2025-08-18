@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProjectExplorer } from './components/ProjectExplorer';
 import { FileTree } from './components/FileTree';
-import { Editor } from './components/Editor';
+import { Editor, EditorRef } from './components/Editor';
 import { PDFViewer } from './components/PDFViewer';
 import { LogPanel } from './components/LogPanel';
 import { ErrorsPanel } from './components/ErrorsPanel';
@@ -70,6 +70,9 @@ function App() {
     message: string;
   }>>>({});
   const [showErrorsPanel, setShowErrorsPanel] = useState(false);
+
+  // Editor ref for direct access to editor functions
+  const editorRef = useRef<EditorRef>(null);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -387,6 +390,11 @@ function App() {
       if (existingTab) {
         // File is already open, just switch to it
         setActiveTabId(existingTab.id);
+        
+        // Wait a bit for the tab to become active, then goto line
+        setTimeout(() => {
+          editorRef.current?.gotoLine(line);
+        }, 100);
       } else {
         // Need to open the file first
         const content = await window.electronAPI.fsReadFile({
@@ -405,10 +413,12 @@ function App() {
         
         setOpenTabs(prev => [...prev, newTab]);
         setActiveTabId(newTab.id);
+        
+        // Wait for the tab to be created and rendered, then goto line
+        setTimeout(() => {
+          editorRef.current?.gotoLine(line);
+        }, 200);
       }
-      
-      // The actual goto line functionality will be handled by the editor component
-      // through the errorMarkersForFile prop and gutter click handlers
       
     } catch (error) {
       console.error('Failed to open file for error:', error);
@@ -675,6 +685,7 @@ function App() {
         <ResizableSplitter
           left={
             <Editor
+              ref={editorRef}
               tabs={openTabs}
               activeTabId={activeTabId}
               onTabSelect={setActiveTabId}
@@ -715,16 +726,9 @@ function App() {
           <ErrorsPanel 
             errors={errors}
             onErrorClick={handleErrorClick}
+            onClose={() => setShowErrorsPanel(false)}
             className="h-48"
           />
-          <button 
-            onClick={() => setShowErrorsPanel(false)}
-            className="absolute top-2 right-2 p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
       )}
     </div>

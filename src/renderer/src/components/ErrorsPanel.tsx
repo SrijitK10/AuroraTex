@@ -11,12 +11,14 @@ interface ErrorItem {
 interface ErrorsPanelProps {
   errors: ErrorItem[];
   onErrorClick: (file: string, line: number) => void;
+  onClose?: () => void;
   className?: string;
 }
 
 export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({ 
   errors, 
   onErrorClick,
+  onClose,
   className = ''
 }) => {
   if (errors.length === 0) {
@@ -46,22 +48,35 @@ export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({
           <h3 className="text-sm font-medium text-gray-900">
             Compilation Issues
           </h3>
-          <div className="flex items-center space-x-3 text-xs">
-            {errorCount > 0 && (
-              <span className="flex items-center text-red-600">
-                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 text-xs">
+              {errorCount > 0 && (
+                <span className="flex items-center text-red-600">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {errorCount} {errorCount === 1 ? 'error' : 'errors'}
+                </span>
+              )}
+              {warningCount > 0 && (
+                <span className="flex items-center text-yellow-600">
+                  <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {warningCount} {warningCount === 1 ? 'warning' : 'warnings'}
+                </span>
+              )}
+            </div>
+            {onClose && (
+              <button 
+                onClick={onClose}
+                className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors"
+                title="Close errors panel"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                {errorCount} {errorCount === 1 ? 'error' : 'errors'}
-              </span>
-            )}
-            {warningCount > 0 && (
-              <span className="flex items-center text-yellow-600">
-                <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {warningCount} {warningCount === 1 ? 'warning' : 'warnings'}
-              </span>
+              </button>
             )}
           </div>
         </div>

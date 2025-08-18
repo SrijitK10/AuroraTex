@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, Compartment } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
@@ -28,6 +28,11 @@ interface ErrorMarker {
   line: number;
   severity: 'error' | 'warning' | 'info';
   message: string;
+}
+
+// Interface for methods exposed via ref
+export interface EditorRef {
+  gotoLine: (line: number) => void;
 }
 
 interface EditorProps {
@@ -77,7 +82,7 @@ const getLanguageSupport = (filename: string) => {
   }
 };
 
-export const Editor: React.FC<EditorProps> = ({
+export const Editor = forwardRef<EditorRef, EditorProps>(({
   tabs,
   activeTabId,
   onTabSelect,
@@ -86,7 +91,7 @@ export const Editor: React.FC<EditorProps> = ({
   onSave,
   errorMarkersForFile = {},
   onGotoLine,
-}) => {
+}, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const [lastSaved, setLastSaved] = useState<{ [key: string]: Date }>({});
@@ -333,19 +338,10 @@ export const Editor: React.FC<EditorProps> = ({
     }
   }, [activeTab]);
 
-  // Expose gotoLine function to parent when requested
-  useEffect(() => {
-    if (onGotoLine && activeTab) {
-      // Register this editor's goto function with the parent
-      const handleGoto = (filePath: string, line: number) => {
-        if (filePath === activeTab.path) {
-          gotoLine(line);
-        }
-      };
-      // Note: This is a simple approach. A more sophisticated approach would use refs
-      // or a context to expose the gotoLine function to the parent component.
-    }
-  }, [onGotoLine, activeTab, gotoLine]);
+  // Expose gotoLine function via ref
+  useImperativeHandle(ref, () => ({
+    gotoLine
+  }), [gotoLine]);
 
   if (tabs.length === 0) {
     return (
@@ -507,4 +503,6 @@ export const Editor: React.FC<EditorProps> = ({
       </div>
     </div>
   );
-};
+});
+
+Editor.displayName = 'Editor';
