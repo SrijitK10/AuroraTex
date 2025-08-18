@@ -38,6 +38,7 @@ export interface ElectronAPI {
   snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;
   snapshotList: (payload: { projectId: string }) => Promise<any[]>;
   snapshotRestore: (payload: { snapshotId: string }) => Promise<{ ok: boolean }>;
+  snapshotDelete: (payload: { snapshotId: string }) => Promise<{ ok: boolean }>;
 
   // Settings APIs
   settingsGet: (payload: { key: string }) => Promise<any>;
@@ -91,6 +92,7 @@ const electronAPI: ElectronAPI = {
   snapshotCreate: (payload) => ipcRenderer.invoke('Snapshot.Create', payload),
   snapshotList: (payload) => ipcRenderer.invoke('Snapshot.List', payload),
   snapshotRestore: (payload) => ipcRenderer.invoke('Snapshot.Restore', payload),
+  snapshotDelete: (payload) => ipcRenderer.invoke('Snapshot.Delete', payload),
 
   // Settings APIs
   settingsGet: (payload) => ipcRenderer.invoke('Settings.Get', payload),

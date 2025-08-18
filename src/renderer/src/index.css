@@ -150,3 +150,48 @@
   background-color: white;
   border-top: 1px solid #e5e7eb;
 }
+
+/* Milestone 7: History panel styles */
+.history-panel {
+  background-color: white;
+  border-left: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.history-panel-container {
+  position: fixed;
+  top: 48px; /* Below topbar */
+  right: 0;
+  height: calc(100vh - 48px);
+  width: 400px;
+  z-index: 50;
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  background-color: white;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.history-panel-container.open {
+  transform: translateX(0);
+}
+
+.history-panel-overlay {
+  position: fixed;
+  top: 48px; /* Below topbar */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  pointer-events: none;
+}
+
+.history-panel-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}

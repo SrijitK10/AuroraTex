@@ -15,7 +15,7 @@ class App {
         this.projectService = new ProjectService_1.ProjectService();
         this.settingsService = new SettingsService_1.SettingsService();
         this.compileOrchestrator = new CompileOrchestrator_1.CompileOrchestrator();
-        this.snapshotService = new SnapshotService_1.SnapshotService();
+        this.snapshotService = new SnapshotService_1.SnapshotService(this.projectService);
     }
     async initialize() {
         await electron_1.app.whenReady();
@@ -167,7 +167,19 @@ class App {
             return await this.snapshotService.list(payload.projectId);
         });
         electron_1.ipcMain.handle('Snapshot.Restore', async (_, payload) => {
-            return await this.snapshotService.restore(payload.snapshotId);
+            try {
+                console.log(`[Main] Starting snapshot restore: ${payload.snapshotId}`);
+                const result = await this.snapshotService.restore(payload.snapshotId);
+                console.log('[Main] Snapshot restore completed successfully');
+                return result;
+            }
+            catch (error) {
+                console.error('[Main] Snapshot restore failed:', error);
+                throw error;
+            }
+        });
+        electron_1.ipcMain.handle('Snapshot.Delete', async (_, payload) => {
+            return await this.snapshotService.delete(payload.snapshotId);
         });
         // Settings IPC handlers
         electron_1.ipcMain.handle('Settings.Get', async (_, payload) => {

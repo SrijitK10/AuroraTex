@@ -34,6 +34,7 @@ const electronAPI = {
     snapshotCreate: (payload) => electron_1.ipcRenderer.invoke('Snapshot.Create', payload),
     snapshotList: (payload) => electron_1.ipcRenderer.invoke('Snapshot.List', payload),
     snapshotRestore: (payload) => electron_1.ipcRenderer.invoke('Snapshot.Restore', payload),
+    snapshotDelete: (payload) => electron_1.ipcRenderer.invoke('Snapshot.Delete', payload),
     // Settings APIs
     settingsGet: (payload) => electron_1.ipcRenderer.invoke('Settings.Get', payload),
     settingsSet: (payload) => electron_1.ipcRenderer.invoke('Settings.Set', payload),

@@ -48,6 +48,8 @@ export interface SnapshotDTO {
   message?: string;
   path: string;
   sizeBytes: number;
+  formattedDate?: string;
+  formattedSize?: string;
 }
 
 export interface TemplateDTO {

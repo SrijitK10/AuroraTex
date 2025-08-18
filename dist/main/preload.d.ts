@@ -122,6 +122,11 @@ export interface ElectronAPI {
     }) => Promise<{
         ok: boolean;
     }>;
+    snapshotDelete: (payload: {
+        snapshotId: string;
+    }) => Promise<{
+        ok: boolean;
+    }>;
     settingsGet: (payload: {
         key: string;
     }) => Promise<any>;

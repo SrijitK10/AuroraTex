@@ -5,6 +5,7 @@ import { Editor, EditorRef } from './components/Editor';
 import { PDFViewer } from './components/PDFViewer';
 import { LogPanel } from './components/LogPanel';
 import { ErrorsPanel } from './components/ErrorsPanel';
+import { HistoryPanel } from './components/HistoryPanel';
 import { Topbar } from './components/Topbar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
@@ -71,6 +72,10 @@ function App() {
   }>>>({});
   const [showErrorsPanel, setShowErrorsPanel] = useState(false);
 
+  // Milestone 7: History panel state
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false);
+
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
 
@@ -118,7 +123,7 @@ function App() {
         loadFileTree();
         
         // Handle file changes for open tabs
-        if (data.type === 'change' && !data.path.includes('.tmp')) {
+        if (data.type === 'change' && !data.path.includes('.tmp') && !isRestoringSnapshot) {
           const affectedTab = openTabs.find(tab => tab.path === data.path);
           if (affectedTab && !affectedTab.isDirty) {
             // File changed externally and tab is not dirty, offer to reload
@@ -153,7 +158,7 @@ function App() {
     return () => {
       window.electronAPI.removeFileChangedListener(handleFileChange);
     };
-  }, [currentProject?.id, openTabs, isAutoCompileEnabled]);
+  }, [currentProject?.id, openTabs, isAutoCompileEnabled, isRestoringSnapshot]);
 
   // Set up compile progress event cleanup on component unmount
   useEffect(() => {
@@ -200,6 +205,34 @@ function App() {
       ));
     } catch (error) {
       console.error('Failed to reload file:', error);
+    }
+  };
+
+  const reloadAllOpenTabs = async () => {
+    if (!currentProject || openTabs.length === 0) return;
+
+    try {
+      const reloadPromises = openTabs.map(async (tab) => {
+        try {
+          const content = await window.electronAPI.fsReadFile({
+            projectId: currentProject.id,
+            relPath: tab.path,
+          });
+          return {
+            ...tab,
+            content: typeof content === 'string' ? content : '',
+            isDirty: false
+          };
+        } catch (error) {
+          console.error(`Failed to reload file ${tab.path}:`, error);
+          return tab; // Keep original tab if reload fails
+        }
+      });
+
+      const reloadedTabs = await Promise.all(reloadPromises);
+      setOpenTabs(reloadedTabs);
+    } catch (error) {
+      console.error('Failed to reload open tabs:', error);
     }
   };
 
@@ -641,6 +674,8 @@ function App() {
     setShowLogPanel(false);
     setPdfRefreshTrigger(0);
     setCompilationStatus('idle');
+    // Milestone 7: Reset history panel state
+    setShowHistoryPanel(false);
   };
 
   if (!currentProject) {
@@ -664,6 +699,8 @@ function App() {
         showErrorsPanel={showErrorsPanel}
         onToggleErrorsPanel={() => setShowErrorsPanel(!showErrorsPanel)}
         errorCount={errors.length}
+        showHistoryPanel={showHistoryPanel}
+        onToggleHistoryPanel={() => setShowHistoryPanel(!showHistoryPanel)}
       />
       
       <div className="flex-1 flex">
@@ -731,6 +768,30 @@ function App() {
           />
         </div>
       )}
+      
+      {/* Milestone 7: History Panel */}
+      <HistoryPanel 
+        projectId={currentProject?.id || null}
+        onClose={() => setShowHistoryPanel(false)}
+        isOpen={showHistoryPanel}
+        className="h-64"
+        onRestoreStart={() => {
+          console.log('[App] Restore started - stopping file watching and setting restore state');
+          setIsRestoringSnapshot(true);
+          // Temporarily stop file watching during restore
+          stopFileWatching();
+        }}
+        onRestoreEnd={() => {
+          console.log('[App] Restore ended - restarting file watching and clearing restore state');
+          setIsRestoringSnapshot(false);
+          // Restart file watching after restore
+          startFileWatching();
+          // Reload all open tabs to reflect the restored content
+          reloadAllOpenTabs();
+          // Refresh file tree as well
+          loadFileTree();
+        }}
+      />
     </div>
   );
 }

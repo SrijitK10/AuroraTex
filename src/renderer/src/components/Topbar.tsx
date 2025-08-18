@@ -22,6 +22,9 @@ interface TopbarProps {
   showErrorsPanel?: boolean;
   onToggleErrorsPanel?: () => void;
   errorCount?: number;
+  // Milestone 7: History panel props
+  showHistoryPanel?: boolean;
+  onToggleHistoryPanel?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -38,7 +41,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleAutoCompile,
   showErrorsPanel = false,
   onToggleErrorsPanel,
-  errorCount = 0
+  errorCount = 0,
+  showHistoryPanel = false,
+  onToggleHistoryPanel
 }) => {
   return (
     <div className="topbar">
@@ -155,6 +160,26 @@ export const Topbar: React.FC<TopbarProps> = ({
                   {errorCount > 99 ? '99+' : errorCount}
                 </span>
               )}
+            </div>
+          </button>
+        )}
+        
+        {/* Milestone 7: History Panel Toggle */}
+        {onToggleHistoryPanel && (
+          <button
+            onClick={onToggleHistoryPanel}
+            className={`px-3 py-2 rounded border font-medium transition-colors ${
+              showHistoryPanel
+                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+            title={`${showHistoryPanel ? 'Hide' : 'Show'} project snapshots and history`}
+          >
+            <div className="flex items-center space-x-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>History</span>
             </div>
           </button>
         )}

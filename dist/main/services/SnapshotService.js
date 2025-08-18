@@ -42,8 +42,8 @@ const tar = __importStar(require("tar"));
 const ProjectService_1 = require("./ProjectService");
 const InMemoryDB_1 = require("./InMemoryDB");
 class SnapshotService {
-    constructor() {
-        this.projectService = new ProjectService_1.ProjectService();
+    constructor(projectService) {
+        this.projectService = projectService || new ProjectService_1.ProjectService();
     }
     async create(projectId, message) {
         const project = await this.projectService.getById(projectId);
@@ -90,9 +90,12 @@ class SnapshotService {
             message: snapshot.message,
             path: snapshot.path,
             sizeBytes: snapshot.sizeBytes,
+            formattedDate: new Date(snapshot.timestamp).toLocaleString(),
+            formattedSize: this.formatBytes(snapshot.sizeBytes),
         }));
     }
     async restore(snapshotId) {
+        console.log(`[SnapshotService] Starting restore of snapshot: ${snapshotId}`);
         const snapshot = InMemoryDB_1.inMemoryDB.getSnapshot(snapshotId);
         if (!snapshot) {
             throw new Error('Snapshot not found');
@@ -104,50 +107,124 @@ class SnapshotService {
         if (!(0, fs_1.existsSync)(snapshot.path)) {
             throw new Error('Snapshot file not found');
         }
-        // Extract tarball to project directory
-        await this.extractTarball(snapshot.path, project.root);
-        return { ok: true };
+        try {
+            console.log('[SnapshotService] Creating auto-backup before restore...');
+            // Create automatic backup before restore
+            await this.create(snapshot.projectId, `Auto-backup before restore (${new Date().toLocaleString()})`);
+            console.log('[SnapshotService] Creating temporary directory for extraction...');
+            // Create temporary directory for extraction
+            const tempDir = (0, path_1.join)(project.root, '.history', `restore-${Date.now()}`);
+            await (0, promises_1.mkdir)(tempDir, { recursive: true });
+            console.log('[SnapshotService] Extracting snapshot to temporary directory...');
+            // Extract snapshot to temp directory
+            await tar.x({
+                file: snapshot.path,
+                cwd: tempDir,
+            });
+            console.log('[SnapshotService] Cleaning current project directory...');
+            // Clean current project files (except .history and output)
+            await this.cleanProjectDirectory(project.root);
+            console.log('[SnapshotService] Copying restored files to project root...');
+            // Copy restored files to project root
+            await this.copyDirectoryContents(tempDir, project.root);
+            console.log('[SnapshotService] Cleaning up temporary directory...');
+            // Clean up temp directory
+            await this.removeDirectory(tempDir);
+            console.log('[SnapshotService] Updating project timestamp...');
+            // Update project timestamp
+            InMemoryDB_1.inMemoryDB.updateProject(snapshot.projectId, {
+                updatedAt: new Date().toISOString()
+            });
+            console.log('[SnapshotService] Restore completed successfully');
+            return { ok: true };
+        }
+        catch (error) {
+            throw new Error(`Failed to restore snapshot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Clean project directory, preserving .history and output directories
+     */
+    async cleanProjectDirectory(projectRoot) {
+        const items = await (0, promises_1.readdir)(projectRoot, { withFileTypes: true });
+        for (const item of items) {
+            const itemPath = (0, path_1.join)(projectRoot, item.name);
+            // Preserve .history and output directories
+            if (item.name === '.history' || item.name === 'output') {
+                continue;
+            }
+            if (item.isDirectory()) {
+                await this.removeDirectory(itemPath);
+            }
+            else {
+                await (0, promises_1.unlink)(itemPath);
+            }
+        }
+    }
+    /**
+     * Copy all contents from source to destination directory
+     */
+    async copyDirectoryContents(sourceDir, destDir) {
+        const items = await (0, promises_1.readdir)(sourceDir, { withFileTypes: true });
+        for (const item of items) {
+            const sourcePath = (0, path_1.join)(sourceDir, item.name);
+            const destPath = (0, path_1.join)(destDir, item.name);
+            if (item.isDirectory()) {
+                if (!(0, fs_1.existsSync)(destPath)) {
+                    await (0, promises_1.mkdir)(destPath, { recursive: true });
+                }
+                await this.copyDirectoryContents(sourcePath, destPath);
+            }
+            else {
+                await (0, promises_1.copyFile)(sourcePath, destPath);
+            }
+        }
+    }
+    /**
+     * Recursively remove a directory and all its contents
+     */
+    async removeDirectory(dirPath) {
+        if (!(0, fs_1.existsSync)(dirPath))
+            return;
+        const items = await (0, promises_1.readdir)(dirPath, { withFileTypes: true });
+        for (const item of items) {
+            const itemPath = (0, path_1.join)(dirPath, item.name);
+            if (item.isDirectory()) {
+                await this.removeDirectory(itemPath);
+            }
+            else {
+                await (0, promises_1.unlink)(itemPath);
+            }
+        }
+        await (0, promises_1.rmdir)(dirPath);
     }
     async createTarball(sourceDir, outputPath) {
-        const files = [];
-        // Collect files to include (excluding output and .history)
-        await this.collectFiles(sourceDir, sourceDir, files);
-        // Create tarball
+        // Create tarball excluding output directory and .history
         await tar.c({
             gzip: true,
             file: outputPath,
             cwd: sourceDir,
             filter: (path) => {
                 // Exclude output directory and .history
-                return !path.includes('output/') && !path.includes('.history/');
+                const normalizedPath = path.replace(/\\/g, '/');
+                return !normalizedPath.includes('output/') &&
+                    !normalizedPath.includes('.history/') &&
+                    !normalizedPath.startsWith('output') &&
+                    !normalizedPath.startsWith('.history');
             },
-        }, files);
+        }, ['.'] // Include current directory
+        );
     }
-    async collectFiles(dir, rootDir, files) {
-        const entries = await (0, promises_1.readdir)(dir);
-        for (const entry of entries) {
-            // Skip output directory, .history, and hidden files
-            if (entry === 'output' || entry === '.history' || entry.startsWith('.')) {
-                continue;
-            }
-            const fullPath = (0, path_1.join)(dir, entry);
-            const relativePath = fullPath.replace(rootDir + '/', '');
-            const stats = await (0, promises_1.stat)(fullPath);
-            if (stats.isDirectory()) {
-                files.push(relativePath);
-                await this.collectFiles(fullPath, rootDir, files);
-            }
-            else {
-                files.push(relativePath);
-            }
-        }
-    }
-    async extractTarball(tarballPath, destDir) {
-        await tar.x({
-            file: tarballPath,
-            cwd: destDir,
-            strip: 0,
-        });
+    /**
+     * Format bytes to human readable string
+     */
+    formatBytes(bytes) {
+        if (bytes === 0)
+            return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
     async delete(snapshotId) {
         const snapshot = InMemoryDB_1.inMemoryDB.getSnapshot(snapshotId);
