@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { ErrorDTO } from './types';
 
 // Define the API interface
 export interface ElectronAPI {
@@ -26,7 +27,7 @@ export interface ElectronAPI {
   // Compile APIs
   compileRun: (payload: { projectId: string; engine?: string; mainFile?: string; isAutoCompile?: boolean }) => Promise<{ jobId: string }>;
   compileStatus: (payload: { jobId: string }) => Promise<any>;
-  compileErrors: (payload: { jobId: string }) => Promise<any[]>;
+  compileErrors: (payload: { jobId: string }) => Promise<ErrorDTO[]>;
   compileCancel: (payload: { jobId: string }) => Promise<{ ok: boolean }>;
   compileMock: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
   // Milestone 5: Queue and auto-compile APIs

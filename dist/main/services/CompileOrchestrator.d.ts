@@ -43,5 +43,9 @@ export declare class CompileOrchestrator extends EventEmitter {
     private copyProjectFiles;
     private runLatexmk;
     private parseLatexErrors;
+    private updateFileStack;
+    private findLineNumber;
+    private findPreviousErrorMessage;
+    private mapTempPathToProject;
 }
 //# sourceMappingURL=CompileOrchestrator.d.ts.map

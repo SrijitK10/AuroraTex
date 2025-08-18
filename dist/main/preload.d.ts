@@ -1,3 +1,4 @@
+import { ErrorDTO } from './types';
 export interface ElectronAPI {
     dialogShowOpenDialog: () => Promise<{
         canceled: boolean;
@@ -86,7 +87,7 @@ export interface ElectronAPI {
     }) => Promise<any>;
     compileErrors: (payload: {
         jobId: string;
-    }) => Promise<any[]>;
+    }) => Promise<ErrorDTO[]>;
     compileCancel: (payload: {
         jobId: string;
     }) => Promise<{

@@ -14,6 +14,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { vim } from '@replit/codemirror-vim';
 import { latex, isLatexFile } from '../editor/latexLanguage';
+import { errorHighlighting, updateErrorMarkers } from '../extensions/errorHighlighting';
 
 interface Tab {
   id: string;
@@ -23,6 +24,12 @@ interface Tab {
   isDirty: boolean;
 }
 
+interface ErrorMarker {
+  line: number;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+}
+
 interface EditorProps {
   tabs: Tab[];
   activeTabId: string | null;
@@ -30,6 +37,9 @@ interface EditorProps {
   onTabClose: (tabId: string) => void;
   onContentChange: (tabId: string, content: string) => void;
   onSave: (tabId: string, content: string, isAutosave?: boolean) => void;
+  // Milestone 6: Error markers support
+  errorMarkersForFile?: Record<string, ErrorMarker[]>; // Keyed by file path
+  onGotoLine?: (filePath: string, line: number) => void;
 }
 
 // Get language support based on file extension
@@ -74,6 +84,8 @@ export const Editor: React.FC<EditorProps> = ({
   onTabClose,
   onContentChange,
   onSave,
+  errorMarkersForFile = {},
+  onGotoLine,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -132,6 +144,8 @@ export const Editor: React.FC<EditorProps> = ({
       foldGutter(),
       syntaxHighlighting(defaultHighlightStyle),
       highlightSelectionMatches(),
+      // Milestone 6: Error highlighting support
+      errorHighlighting(),
       keymap.of([
         indentWithTab,
         ...defaultKeymap,
@@ -294,6 +308,44 @@ export const Editor: React.FC<EditorProps> = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Milestone 6: Update error markers when they change
+  useEffect(() => {
+    if (viewRef.current && activeTab) {
+      const markersForCurrentFile = errorMarkersForFile[activeTab.path] || [];
+      updateErrorMarkers(viewRef.current, markersForCurrentFile);
+    }
+  }, [errorMarkersForFile, activeTab?.path]);
+
+  // Milestone 6: Goto line functionality
+  const gotoLine = useCallback((line: number) => {
+    if (viewRef.current && activeTab) {
+      try {
+        const lineInfo = viewRef.current.state.doc.line(line);
+        viewRef.current.dispatch({
+          selection: { anchor: lineInfo.from, head: lineInfo.from },
+          scrollIntoView: true
+        });
+        viewRef.current.focus();
+      } catch (error) {
+        console.warn(`Could not go to line ${line}:`, error);
+      }
+    }
+  }, [activeTab]);
+
+  // Expose gotoLine function to parent when requested
+  useEffect(() => {
+    if (onGotoLine && activeTab) {
+      // Register this editor's goto function with the parent
+      const handleGoto = (filePath: string, line: number) => {
+        if (filePath === activeTab.path) {
+          gotoLine(line);
+        }
+      };
+      // Note: This is a simple approach. A more sophisticated approach would use refs
+      // or a context to expose the gotoLine function to the parent component.
+    }
+  }, [onGotoLine, activeTab, gotoLine]);
 
   if (tabs.length === 0) {
     return (

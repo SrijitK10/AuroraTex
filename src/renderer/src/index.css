@@ -101,3 +101,52 @@
 .log-panel {
   @apply h-48 bg-gray-900 text-green-400 border-t border-gray-200;
 }
+
+/* Milestone 6: Error highlighting styles */
+.error-line {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.warning-line {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.info-line {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.error-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.error-marker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+.error-marker:hover {
+  transform: scale(1.1);
+}
+
+.cm-error-gutter {
+  width: 20px;
+}
+
+.errors-panel {
+  background-color: white;
+  border-top: 1px solid #e5e7eb;
+}
+
+.errors-panel-container {
+  position: relative;
+  background-color: white;
+  border-top: 1px solid #e5e7eb;
+}

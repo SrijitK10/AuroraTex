@@ -4,6 +4,7 @@ import { FileTree } from './components/FileTree';
 import { Editor } from './components/Editor';
 import { PDFViewer } from './components/PDFViewer';
 import { LogPanel } from './components/LogPanel';
+import { ErrorsPanel } from './components/ErrorsPanel';
 import { Topbar } from './components/Topbar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
@@ -53,6 +54,22 @@ function App() {
     maxConcurrency: number;
   } | undefined>(undefined);
   const [isAutoCompileEnabled, setIsAutoCompileEnabled] = useState(false);
+
+  // Milestone 6: Error parsing and source mapping state
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Array<{
+    file: string;
+    line: number;
+    column?: number;
+    message: string;
+    severity: 'error' | 'warning' | 'info';
+  }>>([]);
+  const [errorMarkersForFile, setErrorMarkersForFile] = useState<Record<string, Array<{
+    line: number;
+    severity: 'error' | 'warning' | 'info';
+    message: string;
+  }>>>({});
+  const [showErrorsPanel, setShowErrorsPanel] = useState(false);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -319,6 +336,85 @@ function App() {
     }));
   };
 
+  // Milestone 6: Fetch and process compilation errors
+  const fetchAndProcessErrors = async (jobId: string) => {
+    if (!jobId) return;
+    
+    try {
+      const fetchedErrors = await window.electronAPI.compileErrors({ jobId });
+      console.log('Fetched errors:', fetchedErrors);
+      
+      setErrors(fetchedErrors);
+      setCurrentJobId(jobId);
+      
+      // Group errors by file for editor gutter markers
+      const markersByFile: Record<string, Array<{
+        line: number;
+        severity: 'error' | 'warning' | 'info';
+        message: string;
+      }>> = {};
+      
+      fetchedErrors.forEach(error => {
+        if (!markersByFile[error.file]) {
+          markersByFile[error.file] = [];
+        }
+        markersByFile[error.file].push({
+          line: error.line,
+          severity: error.severity,
+          message: error.message
+        });
+      });
+      
+      setErrorMarkersForFile(markersByFile);
+      
+      // Show errors panel if there are errors or warnings
+      if (fetchedErrors.length > 0) {
+        setShowErrorsPanel(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch compilation errors:', error);
+    }
+  };
+
+  // Milestone 6: Handle clicking on an error to go to the file and line
+  const handleErrorClick = async (filePath: string, line: number) => {
+    if (!currentProject) return;
+    
+    try {
+      // Check if the file is already open in a tab
+      const existingTab = openTabs.find(tab => tab.path === filePath);
+      
+      if (existingTab) {
+        // File is already open, just switch to it
+        setActiveTabId(existingTab.id);
+      } else {
+        // Need to open the file first
+        const content = await window.electronAPI.fsReadFile({
+          projectId: currentProject.id,
+          relPath: filePath
+        });
+        
+        const fileName = filePath.split('/').pop() || filePath;
+        const newTab: Tab = {
+          id: Date.now().toString(),
+          path: filePath,
+          name: fileName,
+          content: typeof content === 'string' ? content : '',
+          isDirty: false
+        };
+        
+        setOpenTabs(prev => [...prev, newTab]);
+        setActiveTabId(newTab.id);
+      }
+      
+      // The actual goto line functionality will be handled by the editor component
+      // through the errorMarkersForFile prop and gutter click handlers
+      
+    } catch (error) {
+      console.error('Failed to open file for error:', error);
+    }
+  };
+
   const compileProject = async () => {
     if (!currentProject || isCompiling) return;
 
@@ -326,6 +422,10 @@ function App() {
     setCompilationStatus('compiling');
     setShowLogPanel(true); // Milestone 4: Open Log Panel
     setLogs([]);
+    // Milestone 6: Clear previous errors
+    setErrors([]);
+    setErrorMarkersForFile({});
+    setShowErrorsPanel(false);
 
     try {
       const result = await window.electronAPI.compileRun({
@@ -347,10 +447,14 @@ function App() {
             // Milestone 4: Auto-refresh PDF viewer on success
             console.log('Compilation successful - refreshing PDF');
             setPdfRefreshTrigger(prev => prev + 1);
+            // Milestone 6: Fetch and process errors (might have warnings even on success)
+            fetchAndProcessErrors(data.jobId || result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
           } else if (data.state === 'error' || data.state === 'killed') {
             setIsCompiling(false);
             setCompilationStatus('error');
+            // Milestone 6: Fetch and process errors
+            fetchAndProcessErrors(data.jobId || result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
           }
           
@@ -371,7 +475,7 @@ function App() {
           
           if (status.state === 'running') {
             setTimeout(pollStatus, 2000); // Less frequent polling since we have live events
-          } else if (status.state !== 'success') {
+          } else {
             // Handle final state if not caught by events
             setIsCompiling(false);
             if (status.state === 'success') {
@@ -380,6 +484,8 @@ function App() {
             } else {
               setCompilationStatus('error');
             }
+            // Milestone 6: Always fetch errors when compilation finishes
+            fetchAndProcessErrors(result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
           }
         } catch (error) {
@@ -438,11 +544,15 @@ function App() {
             setCompilationStatus('success');
             console.log('✅ Auto-compilation successful - refreshing PDF');
             setPdfRefreshTrigger(prev => prev + 1);
+            // Milestone 6: Fetch and process errors for auto-compile too
+            fetchAndProcessErrors(data.jobId || result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
           } else if (data.state === 'error' || data.state === 'killed') {
             setIsCompiling(false);
             setCompilationStatus('error');
             console.log('❌ Auto-compilation failed');
+            // Milestone 6: Fetch and process errors for auto-compile
+            fetchAndProcessErrors(data.jobId || result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
           }
         }
@@ -541,6 +651,9 @@ function App() {
         queueState={queueState}
         isAutoCompileEnabled={isAutoCompileEnabled}
         onToggleAutoCompile={handleToggleAutoCompile}
+        showErrorsPanel={showErrorsPanel}
+        onToggleErrorsPanel={() => setShowErrorsPanel(!showErrorsPanel)}
+        errorCount={errors.length}
       />
       
       <div className="flex-1 flex">
@@ -568,6 +681,8 @@ function App() {
               onTabClose={closeTab}
               onContentChange={updateTabContent}
               onSave={saveFile}
+              errorMarkersForFile={errorMarkersForFile}
+              onGotoLine={handleErrorClick}
             />
           }
           right={
@@ -591,6 +706,25 @@ function App() {
             isCompiling={isCompiling}
             onClose={() => setShowLogPanel(false)}
           />
+        </div>
+      )}
+      
+      {/* Milestone 6: Errors Panel */}
+      {showErrorsPanel && (
+        <div className="errors-panel-container">
+          <ErrorsPanel 
+            errors={errors}
+            onErrorClick={handleErrorClick}
+            className="h-48"
+          />
+          <button 
+            onClick={() => setShowErrorsPanel(false)}
+            className="absolute top-2 right-2 p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

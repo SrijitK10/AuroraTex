@@ -1,0 +1,14 @@
+{
+  "id": "test-error-project-1",
+  "name": "Test Error Project",
+  "description": "A test project with intentional LaTeX errors",
+  "mainFile": "main.tex",
+  "settings": {
+    "engine": "pdflatex",
+    "shellEscape": false,
+    "bibTool": "bibtex",
+    "timeoutMs": 180000
+  },
+  "createdAt": "2023-12-10T10:00:00.000Z",
+  "updatedAt": "2023-12-10T10:00:00.000Z"
+}

@@ -18,6 +18,10 @@ interface TopbarProps {
   };
   isAutoCompileEnabled?: boolean;
   onToggleAutoCompile?: () => void;
+  // Milestone 6: Error panel props
+  showErrorsPanel?: boolean;
+  onToggleErrorsPanel?: () => void;
+  errorCount?: number;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -31,7 +35,10 @@ export const Topbar: React.FC<TopbarProps> = ({
   onBack,
   queueState,
   isAutoCompileEnabled = false,
-  onToggleAutoCompile
+  onToggleAutoCompile,
+  showErrorsPanel = false,
+  onToggleErrorsPanel,
+  errorCount = 0
 }) => {
   return (
     <div className="topbar">
@@ -126,6 +133,31 @@ export const Topbar: React.FC<TopbarProps> = ({
         >
           Logs
         </button>
+        
+        {/* Milestone 6: Errors Panel Toggle */}
+        {onToggleErrorsPanel && (
+          <button
+            onClick={onToggleErrorsPanel}
+            className={`px-3 py-2 rounded border font-medium transition-colors relative ${
+              showErrorsPanel
+                ? 'bg-red-50 border-red-300 text-red-700'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+            title={`${showErrorsPanel ? 'Hide' : 'Show'} compilation errors and warnings`}
+          >
+            <div className="flex items-center space-x-1">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span>Errors</span>
+              {errorCount > 0 && (
+                <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                  {errorCount > 99 ? '99+' : errorCount}
+                </span>
+              )}
+            </div>
+          </button>
+        )}
       </div>
     </div>
   );

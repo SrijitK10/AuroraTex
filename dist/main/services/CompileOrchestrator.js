@@ -519,41 +519,205 @@ startxref
     parseLatexErrors(logContent, buildDir) {
         const errors = [];
         const lines = logContent.split('\n');
-        let currentFile = '';
+        // File stack to track current file context
         const fileStack = [];
+        let currentFile = '';
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            // Track file stack using parentheses
-            if (line.includes('(./')) {
-                const match = line.match(/\(\.\/([^)]+)/);
-                if (match) {
-                    currentFile = match[1];
-                    fileStack.push(currentFile);
-                }
-            }
-            // Error patterns
-            const errorMatch = line.match(/^(.+):(\d+):\s*(.+)/);
-            if (errorMatch) {
-                const [, file, lineNum, message] = errorMatch;
+            const line = lines[i].trim();
+            // Skip empty lines
+            if (!line)
+                continue;
+            // Track file stack using parentheses - LaTeX opens files with (./ and closes with )
+            this.updateFileStack(line, fileStack, buildDir);
+            currentFile = fileStack.length > 0 ? fileStack[fileStack.length - 1] : '';
+            // Pattern 0: file.tex:line: error message (handle both ./relative and absolute paths)
+            const fileLineErrorMatch = line.match(/^(?:\.\/)?(.+?\.tex):(\d+):\s*(.+)/);
+            if (fileLineErrorMatch) {
+                const [, filePath, lineNum, message] = fileLineErrorMatch;
+                // Extract just the filename from the full path
+                const fileName = filePath.includes('/') ? filePath.split('/').pop() || filePath : filePath;
                 errors.push({
-                    file: file.replace(buildDir + '/', ''),
+                    file: this.mapTempPathToProject(fileName, buildDir),
                     line: parseInt(lineNum),
                     message: message.trim(),
-                    severity: 'error',
+                    severity: 'error'
                 });
+                continue;
             }
-            // Warning patterns
-            const warningMatch = line.match(/Warning.*line (\d+)/i);
-            if (warningMatch && currentFile) {
+            // Pattern 1: ! LaTeX Error: messages
+            if (line.startsWith('! LaTeX Error:')) {
+                const message = line.substring(14).trim(); // Remove '! LaTeX Error:'
+                const lineNumber = this.findLineNumber(lines, i);
+                if (currentFile) {
+                    errors.push({
+                        file: this.mapTempPathToProject(currentFile, buildDir),
+                        line: lineNumber,
+                        message: `LaTeX Error: ${message}`,
+                        severity: 'error'
+                    });
+                }
+                continue;
+            }
+            // Pattern 2: ! Package <name> Error: messages
+            const packageErrorMatch = line.match(/^! Package (\w+) Error:\s*(.+)/);
+            if (packageErrorMatch) {
+                const [, packageName, message] = packageErrorMatch;
+                const lineNumber = this.findLineNumber(lines, i);
+                if (currentFile) {
+                    errors.push({
+                        file: this.mapTempPathToProject(currentFile, buildDir),
+                        line: lineNumber,
+                        message: `Package ${packageName} Error: ${message}`,
+                        severity: 'error'
+                    });
+                }
+                continue;
+            }
+            // Pattern 3: ! <general error messages>
+            if (line.startsWith('!') && !line.startsWith('! =')) {
+                const message = line.substring(1).trim();
+                const lineNumber = this.findLineNumber(lines, i);
+                if (currentFile && message) {
+                    errors.push({
+                        file: this.mapTempPathToProject(currentFile, buildDir),
+                        line: lineNumber,
+                        message: message,
+                        severity: 'error'
+                    });
+                }
+                continue;
+            }
+            // Pattern 4: l.<line> explicit line references
+            const lineRefMatch = line.match(/^l\.(\d+)\s*(.*)$/);
+            if (lineRefMatch) {
+                const [, lineNum, context] = lineRefMatch;
+                // Look back for the error message
+                const errorMessage = this.findPreviousErrorMessage(lines, i);
+                if (currentFile && errorMessage) {
+                    errors.push({
+                        file: this.mapTempPathToProject(currentFile, buildDir),
+                        line: parseInt(lineNum),
+                        message: errorMessage + (context ? ` (at: ${context})` : ''),
+                        severity: 'error'
+                    });
+                }
+                continue;
+            }
+            // Pattern 5: Warning messages
+            if (line.includes('Warning') || line.includes('warning')) {
+                const warningLineMatch = line.match(/.*line (\d+)/);
+                const lineNumber = warningLineMatch ? parseInt(warningLineMatch[1]) : this.findLineNumber(lines, i);
+                if (currentFile) {
+                    errors.push({
+                        file: this.mapTempPathToProject(currentFile, buildDir),
+                        line: lineNumber,
+                        message: line,
+                        severity: 'warning'
+                    });
+                }
+                continue;
+            }
+            // Pattern 6: Overfull/Underfull box warnings
+            const boxWarningMatch = line.match(/(Overfull|Underfull) \\[hv]box.*at lines (\d+)--(\d+)/);
+            if (boxWarningMatch && currentFile) {
+                const [, type, startLine] = boxWarningMatch;
                 errors.push({
-                    file: currentFile,
-                    line: parseInt(warningMatch[1]),
-                    message: line.trim(),
-                    severity: 'warning',
+                    file: this.mapTempPathToProject(currentFile, buildDir),
+                    line: parseInt(startLine),
+                    message: line,
+                    severity: 'warning'
                 });
+                continue;
+            }
+            // Pattern 7: Missing package/file errors
+            if (line.includes('File') && line.includes('not found')) {
+                const lineNumber = this.findLineNumber(lines, i);
+                if (currentFile) {
+                    errors.push({
+                        file: this.mapTempPathToProject(currentFile, buildDir),
+                        line: lineNumber,
+                        message: line,
+                        severity: 'error'
+                    });
+                }
             }
         }
-        return errors;
+        // Sort errors by severity (errors first, then warnings) and then by line number
+        return errors.sort((a, b) => {
+            if (a.severity !== b.severity) {
+                if (a.severity === 'error')
+                    return -1;
+                if (b.severity === 'error')
+                    return 1;
+            }
+            return a.line - b.line;
+        });
+    }
+    // Helper method to track file stack from LaTeX log parentheses
+    updateFileStack(line, fileStack, buildDir) {
+        // Count opening parentheses for file paths
+        const openMatches = line.match(/\([^)]*\.tex/g);
+        if (openMatches) {
+            for (const match of openMatches) {
+                const filePath = match.substring(1); // Remove opening parenthesis
+                // Handle both relative (./) and absolute paths
+                if (filePath.startsWith('./')) {
+                    fileStack.push(filePath.substring(2));
+                }
+                else if (filePath.startsWith(buildDir)) {
+                    fileStack.push(filePath.substring(buildDir.length + 1));
+                }
+                else if (filePath.endsWith('.tex')) {
+                    fileStack.push(filePath);
+                }
+            }
+        }
+        // Count closing parentheses
+        const closeCount = (line.match(/\)/g) || []).length;
+        for (let i = 0; i < closeCount && fileStack.length > 0; i++) {
+            fileStack.pop();
+        }
+    }
+    // Helper method to find line number from context
+    findLineNumber(lines, currentIndex) {
+        // Look ahead for l.<number> pattern
+        for (let i = currentIndex + 1; i < Math.min(currentIndex + 5, lines.length); i++) {
+            const lineMatch = lines[i].match(/^l\.(\d+)/);
+            if (lineMatch) {
+                return parseInt(lineMatch[1]);
+            }
+        }
+        // Look back for line references
+        for (let i = currentIndex - 1; i >= Math.max(currentIndex - 3, 0); i--) {
+            const lineMatch = lines[i].match(/line (\d+)/);
+            if (lineMatch) {
+                return parseInt(lineMatch[1]);
+            }
+        }
+        return 1; // Default line number
+    }
+    // Helper method to find previous error message for l.<line> references
+    findPreviousErrorMessage(lines, currentIndex) {
+        for (let i = currentIndex - 1; i >= Math.max(currentIndex - 5, 0); i--) {
+            const line = lines[i].trim();
+            if (line.startsWith('! ')) {
+                return line.substring(1).trim();
+            }
+        }
+        return '';
+    }
+    // Helper method to map temp build paths back to project relative paths
+    mapTempPathToProject(filePath, buildDir) {
+        // Remove build directory prefix if present
+        if (filePath.startsWith(buildDir)) {
+            filePath = filePath.substring(buildDir.length + 1);
+        }
+        // Remove leading ./
+        if (filePath.startsWith('./')) {
+            filePath = filePath.substring(2);
+        }
+        // Ensure we return relative paths from project root
+        return filePath;
     }
 }
 exports.CompileOrchestrator = CompileOrchestrator;
