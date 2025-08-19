@@ -15,6 +15,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { vim } from '@replit/codemirror-vim';
 import { latex, isLatexFile } from '../editor/latexLanguage';
 import { errorHighlighting, updateErrorMarkers } from '../extensions/errorHighlighting';
+import { latexSnippetsAutocompletion } from '../extensions/latexSnippets';
 
 interface Tab {
   id: string;
@@ -155,17 +156,20 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
       errorHighlighting(),
     ];
     
-    // Add autocomplete for LaTeX files (with error handling)
-    if (isLatexFile(filename)) {
-      try {
-        const autocompleteExt = latexAutocompletion();
-        if (autocompleteExt) {
-          extensions.push(autocompleteExt);
-        }
-      } catch (error) {
-        console.error('Failed to initialize LaTeX autocomplete, continuing without it:', error);
-      }
-    }
+    // Temporarily disable enhanced snippets to fix white screen
+    // Add enhanced snippets autocomplete for LaTeX files
+    // if (isLatexFile(filename)) {
+    //   try {
+    //     const snippetsExt = latexSnippetsAutocompletion();
+    //     if (snippetsExt && Array.isArray(snippetsExt)) {
+    //       extensions.push(...snippetsExt);
+    //     } else if (snippetsExt) {
+    //       extensions.push(snippetsExt);
+    //     }
+    //   } catch (error) {
+    //     console.error('Failed to initialize LaTeX snippets autocomplete, continuing without it:', error);
+    //   }
+    // }
     
     // Add remaining extensions
     extensions.push(
@@ -203,6 +207,15 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
         '.cm-focused': {
           outline: 'none',
         },
+        // Enhanced snippet completion styling
+        '.cm-snippet-completion': {
+          backgroundColor: '#e8f4fd',
+          border: '1px solid #2563eb',
+          fontWeight: 'bold',
+        },
+        '.cm-completionIcon-snippet': {
+          color: '#2563eb',
+        }
       })
     );
     

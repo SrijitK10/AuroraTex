@@ -221,7 +221,7 @@ const latexCompletions = completeFromList([
   ...latexSnippets
 ]);
 
-// Export the language support
+// Export the language support with built-in autocomplete
 export function latex() {
   return new LanguageSupport(latexLanguage, [
     autocompletion({ override: [latexCompletions] })

@@ -24,5 +24,7 @@ export declare class TemplateService {
     private createDefaultTemplates;
     private loadTemplateConfig;
     private loadTemplateFiles;
+    private cleanupDuplicates;
+    private deleteDirectory;
 }
 //# sourceMappingURL=TemplateService.d.ts.map

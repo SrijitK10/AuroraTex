@@ -1,5 +1,5 @@
 import { join, resolve } from 'path';
-import { mkdir, writeFile, readFile, readdir, stat } from 'fs/promises';
+import { mkdir, writeFile, readFile, readdir, stat, rmdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
@@ -33,8 +33,17 @@ export class TemplateService {
       await mkdir(this.templatesDir, { recursive: true });
     }
 
-    // Create default templates if none exist
-    await this.createDefaultTemplates();
+    // Clean up duplicates first
+    await this.cleanupDuplicates();
+
+    // Check if templates have already been initialized
+    const initFlagPath = join(this.templatesDir, '.initialized');
+    if (!existsSync(initFlagPath)) {
+      // Create default templates if none exist
+      await this.createDefaultTemplates();
+      // Create flag file to prevent re-initialization
+      await writeFile(initFlagPath, new Date().toISOString());
+    }
   }
 
   async list(): Promise<TemplateDTO[]> {
@@ -44,6 +53,9 @@ export class TemplateService {
       const items = await readdir(this.templatesDir);
       
       for (const item of items) {
+        // Skip the initialization flag file
+        if (item === '.initialized') continue;
+        
         const templatePath = join(this.templatesDir, item);
         const templateConfigPath = join(templatePath, 'template.json');
         
@@ -68,7 +80,18 @@ export class TemplateService {
       console.error('Failed to list templates:', error);
     }
 
-    return templates;
+    // Remove duplicates based on name and category (keep the first occurrence)
+    const uniqueTemplates = templates.reduce((acc: TemplateDTO[], current: TemplateDTO) => {
+      const exists = acc.find(template => 
+        template.name === current.name && template.category === current.category
+      );
+      if (!exists) {
+        acc.push(current);
+      }
+      return acc;
+    }, []);
+
+    return uniqueTemplates;
   }
 
   async getById(templateId: string): Promise<TemplateDTO | null> {
@@ -109,6 +132,10 @@ export class TemplateService {
   }
 
   private async createDefaultTemplates(): Promise<void> {
+    // Check if any templates already exist
+    const existingTemplates = await this.list();
+    const existingTemplateNames = new Set(existingTemplates.map(t => t.name));
+
     const defaultTemplates = [
       {
         name: 'Article',
@@ -341,6 +368,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
     ];
 
     for (const template of defaultTemplates) {
+      // Skip if template with same name already exists
+      if (existingTemplateNames.has(template.name)) {
+        continue;
+      }
+
       const templateId = uuidv4();
       const templateDir = join(this.templatesDir, templateId);
       
@@ -394,5 +426,78 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
     }
 
     return files;
+  }
+
+  private async cleanupDuplicates(): Promise<void> {
+    try {
+      const items = await readdir(this.templatesDir);
+      const templatesByName = new Map<string, { id: string, path: string, config: TemplateConfig }>();
+      const itemsToDelete: string[] = [];
+
+      // First pass: collect all templates and identify duplicates
+      for (const item of items) {
+        if (item === '.initialized') continue;
+        
+        const templatePath = join(this.templatesDir, item);
+        const templateConfigPath = join(templatePath, 'template.json');
+        
+        if (existsSync(templateConfigPath)) {
+          try {
+            const config = await this.loadTemplateConfig(templateConfigPath);
+            const key = `${config.name}:${config.category}`;
+            
+            if (templatesByName.has(key)) {
+              // This is a duplicate, mark for deletion
+              itemsToDelete.push(item);
+            } else {
+              // First occurrence, keep it
+              templatesByName.set(key, { id: config.id, path: templatePath, config });
+            }
+          } catch (error) {
+            console.error(`Failed to read template config ${item}:`, error);
+            // If we can't read the config, it's probably corrupted, so delete it
+            itemsToDelete.push(item);
+          }
+        }
+      }
+
+      // Second pass: delete duplicate directories
+      for (const item of itemsToDelete) {
+        try {
+          const templatePath = join(this.templatesDir, item);
+          await this.deleteDirectory(templatePath);
+          console.log(`Deleted duplicate template: ${item}`);
+        } catch (error) {
+          console.error(`Failed to delete duplicate template ${item}:`, error);
+        }
+      }
+
+      if (itemsToDelete.length > 0) {
+        console.log(`Cleaned up ${itemsToDelete.length} duplicate templates`);
+      }
+    } catch (error) {
+      console.error('Failed to cleanup duplicates:', error);
+    }
+  }
+
+  private async deleteDirectory(dirPath: string): Promise<void> {
+    try {
+      const items = await readdir(dirPath);
+      
+      for (const item of items) {
+        const itemPath = join(dirPath, item);
+        const stats = await stat(itemPath);
+        
+        if (stats.isDirectory()) {
+          await this.deleteDirectory(itemPath);
+        } else {
+          await unlink(itemPath);
+        }
+      }
+      
+      await rmdir(dirPath);
+    } catch (error) {
+      console.error(`Failed to delete directory ${dirPath}:`, error);
+    }
   }
 }

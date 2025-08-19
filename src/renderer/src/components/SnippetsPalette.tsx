@@ -29,6 +29,7 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const selectedItemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +52,16 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
     // Reset selected index when filtered snippets change
     setSelectedIndex(0);
   }, [filteredSnippets]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [selectedIndex]);
 
   const loadSnippets = async () => {
     try {
@@ -88,20 +99,59 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
 
     switch (e.key) {
       case 'Escape':
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
+        break;
+      case 'P':
+        // Also close with Ctrl+Shift+P (same shortcut that opens it)
+        if (e.ctrlKey && e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
         break;
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => Math.min(prev + 1, filteredSnippets.length - 1));
+        if (filteredSnippets.length > 0) {
+          setSelectedIndex(prev => Math.min(prev + 1, filteredSnippets.length - 1));
+        }
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => Math.max(prev - 1, 0));
+        if (filteredSnippets.length > 0) {
+          setSelectedIndex(prev => Math.max(prev - 1, 0));
+        }
         break;
       case 'Enter':
         e.preventDefault();
         if (filteredSnippets[selectedIndex]) {
           insertSnippet(filteredSnippets[selectedIndex]);
+        }
+        break;
+      case 'Tab':
+        e.preventDefault();
+        // Tab moves down, Shift+Tab moves up
+        if (e.shiftKey) {
+          if (filteredSnippets.length > 0) {
+            setSelectedIndex(prev => Math.max(prev - 1, 0));
+          }
+        } else {
+          if (filteredSnippets.length > 0) {
+            setSelectedIndex(prev => Math.min(prev + 1, filteredSnippets.length - 1));
+          }
+        }
+        break;
+      case 'Home':
+        e.preventDefault();
+        if (filteredSnippets.length > 0) {
+          setSelectedIndex(0);
+        }
+        break;
+      case 'End':
+        e.preventDefault();
+        if (filteredSnippets.length > 0) {
+          setSelectedIndex(filteredSnippets.length - 1);
         }
         break;
     }
@@ -157,7 +207,7 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
           </div>
           <div className="text-sm text-gray-500">
             {filteredSnippets.length} snippet{filteredSnippets.length !== 1 ? 's' : ''} found
-            • Use ↑↓ arrow keys to navigate • Enter to insert • Esc to close
+            • Use ↑↓ arrows (or Tab) to navigate • Enter to insert • Home/End to jump • Esc to close
           </div>
         </div>
 
@@ -175,6 +225,7 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
               {filteredSnippets.map((snippet, index) => (
                 <div
                   key={snippet.id}
+                  ref={index === selectedIndex ? selectedItemRef : null}
                   onClick={() => insertSnippet(snippet)}
                   className={`p-4 cursor-pointer transition-colors ${
                     index === selectedIndex 
@@ -183,9 +234,16 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{snippet.name}</h4>
-                      <p className="text-sm text-gray-600">{snippet.description}</p>
+                    <div className="flex items-center">
+                      {index === selectedIndex && (
+                        <svg className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                      <div>
+                        <h4 className="font-medium text-gray-900">{snippet.name}</h4>
+                        <p className="text-sm text-gray-600">{snippet.description}</p>
+                      </div>
                     </div>
                     <div className="flex space-x-2">
                       <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
@@ -209,7 +267,7 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
         <div className="p-4 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-600">
             <span className="font-medium">Tip:</span> You can also type a snippet trigger (like "figure") 
-            in the editor and press <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Ctrl+Space</kbd> to quickly insert it.
+            in the editor and press <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Ctrl+Shift+P</kbd> or <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Ctrl+.</kbd> to quickly insert it.
           </div>
         </div>
       </div>

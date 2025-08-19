@@ -108,8 +108,14 @@ function App() {
         setShowSidebar(prev => !prev);
       }
       
-      // Ctrl+Space to open snippets palette
-      if (event.ctrlKey && event.code === 'Space') {
+      // Ctrl+Shift+P to open snippets palette (like VS Code command palette)
+      if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+        event.preventDefault();
+        setShowSnippetsPalette(true);
+      }
+      
+      // Ctrl+. (or Cmd+. on Mac) to open snippets palette (quick actions)
+      if ((event.ctrlKey || event.metaKey) && event.key === '.') {
         event.preventDefault();
         setShowSnippetsPalette(true);
       }

@@ -121,7 +121,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             onClick={onOpenSnippets}
             className="px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-            title="Open snippets palette (Ctrl+Space)"
+            title="Open snippets palette (Ctrl+Shift+P or Ctrl+.)"
           >
             <div className="flex items-center space-x-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

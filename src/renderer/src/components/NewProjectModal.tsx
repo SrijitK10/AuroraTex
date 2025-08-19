@@ -37,6 +37,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const loadTemplates = async () => {
     try {
       const templateList = await window.electronAPI.templateList();
+      console.log('Loaded templates:', templateList.length, templateList);
       setTemplates(templateList);
     } catch (error) {
       console.error('Failed to load templates:', error);
