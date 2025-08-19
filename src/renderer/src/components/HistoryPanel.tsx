@@ -59,14 +59,20 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
         onClose();
+        return false;
       }
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
+      // Add event listener with capture = true to handle before other listeners
+      document.addEventListener('keydown', handleKeyDown, { capture: true });
     }
+
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [isOpen, onClose]);
 
   const loadSnapshots = async () => {

@@ -120,8 +120,13 @@ function App() {
         setShowSnippetsPalette(true);
       }
       
-      // Escape key to go back to projects (only if no modal is open)
-      if (event.key === 'Escape' && !(event.target as Element)?.closest?.('.modal')) {
+      // Escape key to go back to projects (only if no modal is open and no panels are open)
+      if (event.key === 'Escape' && 
+          !(event.target as Element)?.closest?.('.modal') &&
+          !showLogPanel && 
+          !showErrorsPanel && 
+          !showHistoryPanel &&
+          !showSnippetsPalette) {
         event.preventDefault();
         handleBackToProjects();
       }
@@ -933,27 +938,21 @@ function App() {
         />
       </div>
       
-      {showLogPanel && (
-        <div className="log-panel">
-          <LogPanel 
-            logs={logs}
-            isCompiling={isCompiling}
-            onClose={() => setShowLogPanel(false)}
-          />
-        </div>
-      )}
+      {/* Log Panel - Slide-out */}
+      <LogPanel 
+        logs={logs}
+        isCompiling={isCompiling}
+        onClose={() => setShowLogPanel(false)}
+        isOpen={showLogPanel}
+      />
       
-      {/* Milestone 6: Errors Panel */}
-      {showErrorsPanel && (
-        <div className="errors-panel-container">
-          <ErrorsPanel 
-            errors={errors}
-            onErrorClick={handleErrorClick}
-            onClose={() => setShowErrorsPanel(false)}
-            className="h-48"
-          />
-        </div>
-      )}
+      {/* Milestone 6: Errors Panel - Slide-out */}
+      <ErrorsPanel 
+        errors={errors}
+        onErrorClick={handleErrorClick}
+        onClose={() => setShowErrorsPanel(false)}
+        isOpen={showErrorsPanel}
+      />
       
       {/* Milestone 7: History Panel */}
       <HistoryPanel 
