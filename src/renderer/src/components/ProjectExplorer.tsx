@@ -84,29 +84,31 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({ onProjectSelec
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div 
-            onClick={() => setShowCreateModal(true)}
-            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-100 transition-colors"
-          >
-            <div className="text-3xl text-gray-400 mb-2">+</div>
-            <div className="text-lg font-medium text-gray-700">New Project</div>
-            <div className="text-sm text-gray-500">Create a new LaTeX document</div>
-          </div>
+        <div className="flex justify-center items-center mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl">
+            <div 
+              onClick={() => setShowCreateModal(true)}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-100 transition-colors min-w-[200px]"
+            >
+              <div className="text-4xl text-gray-400 mb-3">+</div>
+              <div className="text-xl font-medium text-gray-700 mb-2">New Project</div>
+              <div className="text-sm text-gray-500">Create a new LaTeX document</div>
+            </div>
 
-          <div 
-            onClick={openProject}
-            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-100 transition-colors"
-          >
-            <div className="text-3xl text-gray-400 mb-2">📂</div>
-            <div className="text-lg font-medium text-gray-700">Open Project</div>
-            <div className="text-sm text-gray-500">Open an existing project</div>
+            <div 
+              onClick={openProject}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-100 transition-colors min-w-[200px]"
+            >
+              <div className="text-4xl text-gray-400 mb-3">📂</div>
+              <div className="text-xl font-medium text-gray-700 mb-2">Open Project</div>
+              <div className="text-sm text-gray-500">Open an existing project</div>
+            </div>
           </div>
         </div>
 
         {projects.length > 0 && (
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Recent Projects</h2>
+          <div className="mt-16">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-6 text-center">Recent Projects</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((project) => (
                 <div
