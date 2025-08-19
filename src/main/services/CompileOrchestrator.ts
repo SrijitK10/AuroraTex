@@ -76,13 +76,26 @@ export class CompileOrchestrator extends EventEmitter {
   private autoCompileTimers: Map<string, NodeJS.Timeout> = new Map(); // projectId -> timer
   private lastCompileEnd: Map<string, number> = new Map(); // projectId -> timestamp
   private pendingAutoCompile: Map<string, boolean> = new Map(); // projectId -> needsBuild flag
-  private autoCompileDebounceMs = 3000; // 3 seconds debounce
+  private autoCompileDebounceMs = 750; // Default 750ms debounce
   private autoCompileMinInterval = 5000; // 5 seconds minimum between auto-compiles
 
   constructor() {
     super();
     this.projectService = new ProjectService();
     this.settingsService = new SettingsService();
+  }
+
+  // Set auto-compile debounce delay
+  setAutoCompileDelay(delayMs: number): void {
+    if (delayMs >= 100 && delayMs <= 10000) {
+      this.autoCompileDebounceMs = delayMs;
+      console.log(`[CompileOrchestrator] Auto-compile delay set to: ${delayMs}ms`);
+    }
+  }
+
+  // Get current auto-compile delay
+  getAutoCompileDelay(): number {
+    return this.autoCompileDebounceMs;
   }
 
   // Milestone 5: Debounced auto-compile triggered by file saves

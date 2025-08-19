@@ -11,6 +11,7 @@ import { BibManager } from './components/BibManager';
 import { Topbar } from './components/Topbar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
+import SettingsModal from './components/SettingsModal';
 
 export interface Project {
   id: string;
@@ -57,6 +58,8 @@ function App() {
     maxConcurrency: number;
   } | undefined>(undefined);
   const [isAutoCompileEnabled, setIsAutoCompileEnabled] = useState(false);
+  const [autoCompileDelay, setAutoCompileDelay] = useState(750); // Default 750ms
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Milestone 6: Error parsing and source mapping state
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -444,6 +447,20 @@ function App() {
       ));
       
       console.log(`File saved: ${tab.path} (autosave: ${isAutosave})`);
+      
+      // Auto-compile integration: trigger auto-compile if enabled and file is a .tex file
+      if (isAutoCompileEnabled && tab.path.toLowerCase().endsWith('.tex')) {
+        console.log(`Auto-compile trigger: saving ${tab.path} with auto-compile enabled`);
+        try {
+          await window.electronAPI.compileTriggerAutoCompile({
+            projectId: currentProject.id
+          });
+          console.log('Auto-compile triggered successfully');
+        } catch (error) {
+          console.error('Failed to trigger auto-compile:', error);
+          // Don't show an alert for auto-compile failures to avoid disrupting user workflow
+        }
+      }
     } catch (error) {
       console.error('Failed to save file:', error);
       alert('Failed to save file: ' + (error as Error).message);
@@ -742,19 +759,42 @@ function App() {
     }
   };
 
-  const handleToggleAutoCompile = () => {
-    const newState = !isAutoCompileEnabled;
-    setIsAutoCompileEnabled(newState);
-    console.log('Auto-compile mode:', newState ? 'enabled' : 'disabled');
+  const handleToggleAutoCompile = (enabled: boolean) => {
+    setIsAutoCompileEnabled(enabled);
+    console.log('Auto-compile mode:', enabled ? 'enabled' : 'disabled');
     
     // If enabling auto-compile, trigger an immediate compilation to test
-    if (newState && currentProject) {
+    if (enabled && currentProject) {
       console.log('Auto-compile enabled - triggering immediate test compilation');
       setTimeout(() => {
         handleAutoCompile();
       }, 100); // Small delay to ensure state is updated
     }
   };
+
+  const handleAutoCompileDelayChange = async (delayMs: number) => {
+    setAutoCompileDelay(delayMs);
+    try {
+      await window.electronAPI.compileSetAutoCompileDelay({ delayMs });
+      console.log('Auto-compile delay updated to:', delayMs, 'ms');
+    } catch (error) {
+      console.error('Failed to update auto-compile delay:', error);
+    }
+  };
+
+  // Load auto-compile delay on startup
+  useEffect(() => {
+    const loadAutoCompileDelay = async () => {
+      try {
+        const result = await window.electronAPI.compileGetAutoCompileDelay();
+        setAutoCompileDelay(result.delayMs);
+      } catch (error) {
+        console.error('Failed to load auto-compile delay:', error);
+      }
+    };
+
+    loadAutoCompileDelay();
+  }, []);
 
   const activeTab = openTabs.find(tab => tab.id === activeTabId);
 
@@ -878,8 +918,6 @@ function App() {
         onToggleSidebar={() => setShowSidebar(!showSidebar)}
         onBack={handleBackToProjects}
         queueState={queueState}
-        isAutoCompileEnabled={isAutoCompileEnabled}
-        onToggleAutoCompile={handleToggleAutoCompile}
         showErrorsPanel={showErrorsPanel}
         onToggleErrorsPanel={() => setShowErrorsPanel(!showErrorsPanel)}
         errorCount={errors.length}
@@ -887,6 +925,7 @@ function App() {
         onToggleHistoryPanel={() => setShowHistoryPanel(!showHistoryPanel)}
         onOpenSnippets={() => setShowSnippetsPalette(true)}
         onOpenBibliography={handleOpenBibliography}
+        onOpenSettings={() => setShowSettingsModal(true)}
       />
       
       <div className="flex-1 flex">
@@ -976,10 +1015,20 @@ function App() {
       />
 
       {/* Milestone 8: Snippets Palette */}
-      <SnippetsPalette
+      <SnippetsPalette 
         isOpen={showSnippetsPalette}
         onClose={() => setShowSnippetsPalette(false)}
         onInsertSnippet={handleInsertSnippet}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        isAutoCompileEnabled={isAutoCompileEnabled}
+        onToggleAutoCompile={handleToggleAutoCompile}
+        autoCompileDelay={autoCompileDelay}
+        onAutoCompileDelayChange={handleAutoCompileDelayChange}
       />
 
       {/* Milestone 8: Bibliography Manager */}
@@ -993,6 +1042,4 @@ function App() {
       )}
     </div>
   );
-}
-
-export default App;
+}export default App;

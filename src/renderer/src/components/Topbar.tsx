@@ -9,14 +9,12 @@ interface TopbarProps {
   showSidebar: boolean;
   onToggleSidebar: () => void;
   onBack: () => void;
-  // Milestone 5: Queue and compile mode props
+  // Milestone 5: Queue props
   queueState?: {
     pending: number;
     running: number;
     maxConcurrency: number;
   };
-  isAutoCompileEnabled?: boolean;
-  onToggleAutoCompile?: () => void;
   // Milestone 6: Error panel props
   showErrorsPanel?: boolean;
   onToggleErrorsPanel?: () => void;
@@ -27,6 +25,8 @@ interface TopbarProps {
   // Milestone 8: Templates, snippets, and bibliography props
   onOpenSnippets?: () => void;
   onOpenBibliography?: () => void;
+  // Settings modal
+  onOpenSettings?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -38,15 +38,14 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleSidebar,
   onBack,
   queueState,
-  isAutoCompileEnabled = false,
-  onToggleAutoCompile,
   showErrorsPanel = false,
   onToggleErrorsPanel,
   errorCount = 0,
   showHistoryPanel = false,
   onToggleHistoryPanel,
   onOpenSnippets,
-  onOpenBibliography
+  onOpenBibliography,
+  onOpenSettings
 }) => {
   return (
     <div className="topbar">
@@ -96,21 +95,20 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
       
       <div className="flex items-center space-x-2">
-        {/* Milestone 5: Auto-compile toggle */}
-        {onToggleAutoCompile && (
+        {/* Settings Button */}
+        {onOpenSettings && (
           <button
-            onClick={() => {
-              console.log('Topbar: Auto-compile button clicked, current state:', isAutoCompileEnabled);
-              onToggleAutoCompile();
-            }}
-            className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-              isAutoCompileEnabled
-                ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-            }`}
-            title={isAutoCompileEnabled ? 'Auto-compile enabled' : 'Auto-compile disabled'}
+            onClick={onOpenSettings}
+            className="px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            title="Open settings"
           >
-            {isAutoCompileEnabled ? '🔄 Auto' : '⏸️ Manual'}
+            <div className="flex items-center space-x-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Settings</span>
+            </div>
           </button>
         )}
         

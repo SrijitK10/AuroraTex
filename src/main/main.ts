@@ -187,6 +187,16 @@ class App {
       return this.compileOrchestrator.triggerAutoCompile(payload.projectId);
     });
 
+    // Auto-compile delay settings
+    ipcMain.handle('Compile.SetAutoCompileDelay', async (_, payload) => {
+      this.compileOrchestrator.setAutoCompileDelay(payload.delayMs);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Compile.GetAutoCompileDelay', async () => {
+      return { delayMs: this.compileOrchestrator.getAutoCompileDelay() };
+    });
+
     // Setup compile progress events (Milestone 4)
     this.compileOrchestrator.on('progress', (data) => {
       if (this.mainWindow) {

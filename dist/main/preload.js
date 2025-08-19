@@ -29,6 +29,8 @@ const electronAPI = {
     // Milestone 5: Queue and auto-compile APIs
     compileQueueState: (payload) => electron_1.ipcRenderer.invoke('Compile.QueueState', payload),
     compileTriggerAutoCompile: (payload) => electron_1.ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),
+    compileSetAutoCompileDelay: (payload) => electron_1.ipcRenderer.invoke('Compile.SetAutoCompileDelay', payload),
+    compileGetAutoCompileDelay: () => electron_1.ipcRenderer.invoke('Compile.GetAutoCompileDelay'),
     // Snapshot APIs
     snapshotCreate: (payload) => electron_1.ipcRenderer.invoke('Snapshot.Create', payload),
     snapshotList: (payload) => electron_1.ipcRenderer.invoke('Snapshot.List', payload),

@@ -105,6 +105,14 @@ export interface ElectronAPI {
     }) => Promise<{
         ok: boolean;
     }>;
+    compileSetAutoCompileDelay: (payload: {
+        delayMs: number;
+    }) => Promise<{
+        ok: boolean;
+    }>;
+    compileGetAutoCompileDelay: () => Promise<{
+        delayMs: number;
+    }>;
     snapshotCreate: (payload: {
         projectId: string;
         message?: string;

@@ -32,6 +32,8 @@ export interface ElectronAPI {
   // Milestone 5: Queue and auto-compile APIs
   compileQueueState: (payload: { projectId: string }) => Promise<{ pending: number; running: number; maxConcurrency: number }>;
   compileTriggerAutoCompile: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
+  compileSetAutoCompileDelay: (payload: { delayMs: number }) => Promise<{ ok: boolean }>;
+  compileGetAutoCompileDelay: () => Promise<{ delayMs: number }>;
 
   // Snapshot APIs
   snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;
@@ -100,6 +102,8 @@ const electronAPI: ElectronAPI = {
   // Milestone 5: Queue and auto-compile APIs
   compileQueueState: (payload) => ipcRenderer.invoke('Compile.QueueState', payload),
   compileTriggerAutoCompile: (payload) => ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),
+  compileSetAutoCompileDelay: (payload) => ipcRenderer.invoke('Compile.SetAutoCompileDelay', payload),
+  compileGetAutoCompileDelay: () => ipcRenderer.invoke('Compile.GetAutoCompileDelay'),
 
   // Snapshot APIs
   snapshotCreate: (payload) => ipcRenderer.invoke('Snapshot.Create', payload),

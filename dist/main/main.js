@@ -150,6 +150,14 @@ class App {
         electron_1.ipcMain.handle('Compile.TriggerAutoCompile', async (_, payload) => {
             return this.compileOrchestrator.triggerAutoCompile(payload.projectId);
         });
+        // Auto-compile delay settings
+        electron_1.ipcMain.handle('Compile.SetAutoCompileDelay', async (_, payload) => {
+            this.compileOrchestrator.setAutoCompileDelay(payload.delayMs);
+            return { ok: true };
+        });
+        electron_1.ipcMain.handle('Compile.GetAutoCompileDelay', async () => {
+            return { delayMs: this.compileOrchestrator.getAutoCompileDelay() };
+        });
         // Setup compile progress events (Milestone 4)
         this.compileOrchestrator.on('progress', (data) => {
             if (this.mainWindow) {

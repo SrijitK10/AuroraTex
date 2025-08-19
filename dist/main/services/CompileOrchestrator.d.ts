@@ -15,6 +15,8 @@ export declare class CompileOrchestrator extends EventEmitter {
     private autoCompileDebounceMs;
     private autoCompileMinInterval;
     constructor();
+    setAutoCompileDelay(delayMs: number): void;
+    getAutoCompileDelay(): number;
     triggerAutoCompile(projectId: string): void;
     private handleAutoCompile;
     getQueueState(): {
