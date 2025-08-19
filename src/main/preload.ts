@@ -29,7 +29,6 @@ export interface ElectronAPI {
   compileStatus: (payload: { jobId: string }) => Promise<any>;
   compileErrors: (payload: { jobId: string }) => Promise<ErrorDTO[]>;
   compileCancel: (payload: { jobId: string }) => Promise<{ ok: boolean }>;
-  compileMock: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
   // Milestone 5: Queue and auto-compile APIs
   compileQueueState: (payload: { projectId: string }) => Promise<{ pending: number; running: number; maxConcurrency: number }>;
   compileTriggerAutoCompile: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
@@ -98,7 +97,6 @@ const electronAPI: ElectronAPI = {
   compileStatus: (payload) => ipcRenderer.invoke('Compile.Status', payload),
   compileErrors: (payload) => ipcRenderer.invoke('Compile.Errors', payload),
   compileCancel: (payload) => ipcRenderer.invoke('Compile.Cancel', payload),
-  compileMock: (payload) => ipcRenderer.invoke('Compile.Mock', payload),
   // Milestone 5: Queue and auto-compile APIs
   compileQueueState: (payload) => ipcRenderer.invoke('Compile.QueueState', payload),
   compileTriggerAutoCompile: (payload) => ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),

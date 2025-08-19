@@ -26,7 +26,6 @@ export interface ElectronAPI {
   compileStatus: (payload: { jobId: string }) => Promise<any>;
   compileErrors: (payload: { jobId: string }) => Promise<any[]>;
   compileCancel: (payload: { jobId: string }) => Promise<{ ok: boolean }>;
-  compileMock: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
   // Milestone 5: Queue and auto-compile APIs
   compileQueueState: (payload: { projectId: string }) => Promise<{ pending: number; running: number; maxConcurrency: number }>;
   compileTriggerAutoCompile: (payload: { projectId: string }) => Promise<{ ok: boolean }>;

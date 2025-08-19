@@ -201,12 +201,6 @@ class App {
       }
     });
 
-    // Mock compile for testing (Milestone 3)
-    ipcMain.handle('Compile.Mock', async (_, payload) => {
-      await this.compileOrchestrator.createMockPDF(payload.projectId);
-      return { ok: true };
-    });
-
     // Snapshot IPC handlers
     ipcMain.handle('Snapshot.Create', async (_, payload) => {
       return await this.snapshotService.create(payload.projectId, payload.message);

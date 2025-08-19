@@ -26,7 +26,6 @@ const electronAPI = {
     compileStatus: (payload) => electron_1.ipcRenderer.invoke('Compile.Status', payload),
     compileErrors: (payload) => electron_1.ipcRenderer.invoke('Compile.Errors', payload),
     compileCancel: (payload) => electron_1.ipcRenderer.invoke('Compile.Cancel', payload),
-    compileMock: (payload) => electron_1.ipcRenderer.invoke('Compile.Mock', payload),
     // Milestone 5: Queue and auto-compile APIs
     compileQueueState: (payload) => electron_1.ipcRenderer.invoke('Compile.QueueState', payload),
     compileTriggerAutoCompile: (payload) => electron_1.ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),

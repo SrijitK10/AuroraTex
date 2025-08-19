@@ -6,7 +6,6 @@ interface TopbarProps {
   isCompiling: boolean;
   onCompile: () => void;
   onToggleLog: () => void;
-  onMockCompile?: () => void;
   showSidebar: boolean;
   onToggleSidebar: () => void;
   onBack: () => void;
@@ -35,7 +34,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   isCompiling, 
   onCompile, 
   onToggleLog,
-  onMockCompile,
   showSidebar,
   onToggleSidebar,
   onBack,
@@ -145,15 +143,6 @@ export const Topbar: React.FC<TopbarProps> = ({
               </svg>
               <span>Bibliography</span>
             </div>
-          </button>
-        )}
-        
-        {onMockCompile && (
-          <button
-            onClick={onMockCompile}
-            className="px-3 py-2 rounded border border-blue-300 text-blue-700 hover:bg-blue-50"
-          >
-            Mock PDF
           </button>
         )}
         

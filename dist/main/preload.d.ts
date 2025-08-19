@@ -93,11 +93,6 @@ export interface ElectronAPI {
     }) => Promise<{
         ok: boolean;
     }>;
-    compileMock: (payload: {
-        projectId: string;
-    }) => Promise<{
-        ok: boolean;
-    }>;
     compileQueueState: (payload: {
         projectId: string;
     }) => Promise<{

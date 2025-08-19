@@ -128,7 +128,7 @@ function App() {
           !showHistoryPanel &&
           !showSnippetsPalette) {
         event.preventDefault();
-        handleBackToProjects();
+        handleEscapeBackToProjects();
       }
     };
 
@@ -756,25 +756,17 @@ function App() {
     }
   };
 
-  const mockCompile = async () => {
-    if (!currentProject) return;
+  const activeTab = openTabs.find(tab => tab.id === activeTabId);
 
-    setCompilationStatus('compiling');
-    try {
-      await window.electronAPI.compileMock({
-        projectId: currentProject.id,
-      });
-      console.log('Mock PDF created successfully - refreshing PDF');
-      setCompilationStatus('success');
-      // Trigger PDF refresh
-      setPdfRefreshTrigger(prev => prev + 1);
-    } catch (error) {
-      console.error('Failed to create mock PDF:', error);
-      setCompilationStatus('error');
+  const handleEscapeBackToProjects = () => {
+    // Show confirmation dialog for Escape key navigation
+    const confirmed = window.confirm(
+      'Are you sure you want to go back to the project list?\n\nPress OK to continue or Cancel to stay in the project.'
+    );
+    if (confirmed) {
+      handleBackToProjects();
     }
   };
-
-  const activeTab = openTabs.find(tab => tab.id === activeTabId);
 
   const handleBackToProjects = async () => {
     // Check for unsaved changes
@@ -792,10 +784,12 @@ function App() {
       const hasUnsavedChanges = openTabs.some(tab => tab.isDirty);
       const timeSinceLastSnapshot = lastSnapshotTime ? (Date.now() - lastSnapshotTime) / (1000 * 60) : Infinity;
       
-      // Create snapshot if there are unsaved changes or it's been a while since last snapshot
-      if (hasUnsavedChanges || timeSinceLastSnapshot >= 30) {
-        await createAutoSnapshot('Auto-snapshot before returning to project list');
-      }
+      // Always create snapshot when leaving the editor to preserve work session
+      const message = hasUnsavedChanges 
+        ? 'Auto-snapshot with unsaved changes before returning to project list'
+        : 'Auto-snapshot of current session before returning to project list';
+      
+      await createAutoSnapshot(message);
     }
 
     // Stop file watching for current project
@@ -827,11 +821,13 @@ function App() {
       const hasUnsavedChanges = openTabs.some(tab => tab.isDirty);
       const timeSinceLastSnapshot = lastSnapshotTime ? (Date.now() - lastSnapshotTime) / (1000 * 60) : Infinity;
       
-      // Create snapshot if there are unsaved changes or it's been a while since last snapshot
-      if (hasUnsavedChanges || timeSinceLastSnapshot >= 30) {
-        console.log(`Creating auto-snapshot before switching from ${currentProject.name} to ${newProject.name}`);
-        await createAutoSnapshot(`Auto-snapshot before switching to "${newProject.name}"`);
-      }
+      // Always create snapshot when switching projects to preserve work session
+      const message = hasUnsavedChanges 
+        ? `Auto-snapshot with unsaved changes before switching to "${newProject.name}"`
+        : `Auto-snapshot of current session before switching to "${newProject.name}"`;
+      
+      console.log(`Creating auto-snapshot before switching from ${currentProject.name} to ${newProject.name}`);
+      await createAutoSnapshot(message);
     }
 
     // Set the new project
@@ -878,7 +874,6 @@ function App() {
         isCompiling={isCompiling}
         onCompile={compileProject}
         onToggleLog={() => setShowLogPanel(!showLogPanel)}
-        onMockCompile={mockCompile}
         showSidebar={showSidebar}
         onToggleSidebar={() => setShowSidebar(!showSidebar)}
         onBack={handleBackToProjects}

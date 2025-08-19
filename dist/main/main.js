@@ -162,11 +162,6 @@ class App {
                 this.mainWindow.webContents.send('Compile.QueueStateChange', data);
             }
         });
-        // Mock compile for testing (Milestone 3)
-        electron_1.ipcMain.handle('Compile.Mock', async (_, payload) => {
-            await this.compileOrchestrator.createMockPDF(payload.projectId);
-            return { ok: true };
-        });
         // Snapshot IPC handlers
         electron_1.ipcMain.handle('Snapshot.Create', async (_, payload) => {
             return await this.snapshotService.create(payload.projectId, payload.message);

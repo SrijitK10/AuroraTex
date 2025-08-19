@@ -27,7 +27,6 @@ export interface ElectronAPI {
   compileStatus: (payload: { jobId: string }) => Promise<any>;
   compileErrors: (payload: { jobId: string }) => Promise<any[]>;
   compileCancel: (payload: { jobId: string }) => Promise<{ ok: boolean }>;
-  compileMock: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
 
   // Snapshot APIs
   snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;

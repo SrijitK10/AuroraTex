@@ -26,7 +26,6 @@ export declare class CompileOrchestrator extends EventEmitter {
             isAutoCompile: boolean;
         }>;
     };
-    createMockPDF(projectId: string): Promise<void>;
     run(projectId: string, engine?: string, mainFile?: string, isAutoCompile?: boolean): Promise<{
         jobId: string;
     }>;

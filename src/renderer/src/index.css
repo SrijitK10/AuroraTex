@@ -96,6 +96,9 @@
 
 .topbar {
   @apply h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4;
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .log-panel {
