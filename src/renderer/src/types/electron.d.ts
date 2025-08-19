@@ -41,6 +41,11 @@ export interface ElectronAPI {
   settingsGet: (payload: { key: string }) => Promise<any>;
   settingsSet: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>;
   settingsCheckTeX: () => Promise<{ found: boolean; paths: any }>;
+  settingsGetTexSettings: () => Promise<any>;
+  settingsUpdateTexSettings: (payload: { settings: any }) => Promise<{ ok: boolean }>;
+  settingsRedetectTeX: () => Promise<any>;
+  settingsSetActiveDistribution: (payload: { distributionName: string }) => Promise<{ ok: boolean }>;
+  settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => Promise<{ ok: boolean }>;
 
   // Event listeners
   onCompileProgress: (callback: (event: any, data: any) => void) => void;

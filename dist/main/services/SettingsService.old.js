@@ -1,10 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SettingsService = void 0;
+const fs_1 = require("fs");
+const InMemoryDB_1 = require("./InMemoryDB");
 const TeXDetectionService_1 = require("./TeXDetectionService");
 class SettingsService {
     constructor() {
-        this.inMemoryDB = new Map();
+        // Initialize defaults
+        InMemoryDB_1.inMemoryDB.initializeDefaults();
         this.texDetection = new TeXDetectionService_1.TeXDetectionService();
     }
     async initialize() {
@@ -16,13 +19,6 @@ class SettingsService {
             await this.detectAndStoreTeXDistribution();
             await this.set('tex.initialized', true);
         }
-    }
-    async get(key) {
-        return this.inMemoryDB.get(key) || null;
-    }
-    async set(key, value) {
-        this.inMemoryDB.set(key, value);
-        return { ok: true };
     }
     async detectAndStoreTeXDistribution() {
         const distributions = await this.texDetection.detectAllDistributions();
@@ -123,6 +119,61 @@ class SettingsService {
         await this.updateTexSettings(settings);
         return { ok: true };
     }
+    async get(key) {
+        const value = InMemoryDB_1.inMemoryDB.getPreference(key);
+        if (!value)
+            return null;
+        // Try to parse as JSON, fallback to string
+        try {
+            return JSON.parse(value);
+        }
+        catch {
+            return value;
+        }
+    }
+    async set(key, value) {
+        const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+        InMemoryDB_1.inMemoryDB.setPreference(key, valueStr);
+        return { ok: true };
+    }
+    async detectAndStoreTeXDistribution() {
+        const distribution = await this.texDetection.detectTeXDistribution();
+        // Store binary paths
+        const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+        for (const binary of binaries) {
+            const binaryInfo = distribution[binary];
+            if (binaryInfo && binaryInfo.path) {
+                await this.set(`tex.${binary}Path`, binaryInfo.path);
+                if (binaryInfo.version) {
+                    await this.set(`tex.${binary}Version`, binaryInfo.version);
+                }
+            }
+        }
+        // Store distribution metadata
+        await this.set('tex.isBundled', distribution.isBundled);
+        await this.set('tex.isValid', distribution.isValid);
+        await this.set('tex.lastDetection', new Date().toISOString());
+        return distribution;
+    }
+    async getTeXDistribution() {
+        const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+        const distribution = {
+            isBundled: await this.get('tex.isBundled') || false,
+            isValid: false
+        };
+        for (const binary of binaries) {
+            const path = await this.get(`tex.${binary}Path`) || '';
+            const version = await this.get(`tex.${binary}Version`) || undefined;
+            distribution[binary] = {
+                name: binary,
+                path,
+                version,
+                isValid: !!path && (0, fs_1.existsSync)(path)
+            };
+        }
+        distribution.isValid = distribution.latexmk.isValid && distribution.pdflatex.isValid;
+        return distribution;
+    }
     async updateBinaryPath(binary, path) {
         const isValid = await this.texDetection.validateBinaryPath(path, binary);
         if (isValid) {
@@ -132,33 +183,45 @@ class SettingsService {
         }
         return { ok: true, valid: isValid };
     }
-    // Legacy support for existing compile system
-    async checkTexInstallation() {
-        const settings = await this.getTexSettings();
-        const paths = {};
-        const activeDistribution = settings.distributions.find(d => d.isActive);
-        if (activeDistribution) {
-            const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
-            for (const binary of binaries) {
-                const binaryInfo = activeDistribution[binary];
-                if (binaryInfo && binaryInfo.path && binaryInfo.isValid) {
-                    paths[binary] = binaryInfo.path;
-                }
+    async redetectTeXDistribution() {
+        console.log('[SettingsService] Re-detecting TeX distribution...');
+        return await this.detectAndStoreTeXDistribution();
+    }
+    async getTexSettings() {
+        return await this.getTeXDistribution();
+    }
+    async updateTexSettings(settings) {
+        // Update binary paths if provided
+        for (const binary of ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex']) {
+            const binaryInfo = settings[binary];
+            if (binaryInfo && binaryInfo.path) {
+                await this.updateBinaryPath(binary, binaryInfo.path);
             }
         }
-        return { found: activeDistribution?.isValid || false, paths };
+        return { ok: true };
+    }
+    async redetectTeX() {
+        return await this.redetectTeXDistribution();
+    }
+    async checkTexInstallation() {
+        const distribution = await this.getTeXDistribution();
+        const paths = {};
+        const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+        for (const binary of binaries) {
+            const binaryInfo = distribution[binary];
+            if (binaryInfo && binaryInfo.path) {
+                paths[binary] = binaryInfo.path;
+            }
+        }
+        return { found: distribution.isValid, paths };
     }
     async getTexBinaryPath(binary) {
-        const settings = await this.getTexSettings();
-        const activeDistribution = settings.distributions.find(d => d.isActive);
-        if (activeDistribution) {
-            const binaryInfo = activeDistribution[binary];
-            if (binaryInfo && binaryInfo.path && binaryInfo.isValid) {
-                return binaryInfo.path;
-            }
+        const storedPath = await this.get(`tex.${binary}Path`);
+        if (storedPath && (0, fs_1.existsSync)(storedPath)) {
+            return storedPath;
         }
         return null;
     }
 }
 exports.SettingsService = SettingsService;
-//# sourceMappingURL=SettingsService.js.map
+//# sourceMappingURL=SettingsService.old.js.map

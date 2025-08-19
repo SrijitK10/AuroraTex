@@ -143,6 +143,24 @@ export interface ElectronAPI {
         found: boolean;
         paths: any;
     }>;
+    settingsGetTexSettings: () => Promise<any>;
+    settingsUpdateTexSettings: (payload: {
+        settings: any;
+    }) => Promise<{
+        ok: boolean;
+    }>;
+    settingsRedetectTeX: () => Promise<any>;
+    settingsSetActiveDistribution: (payload: {
+        distributionName: string;
+    }) => Promise<{
+        ok: boolean;
+    }>;
+    settingsAddCustomDistribution: (payload: {
+        name: string;
+        paths: Record<string, string>;
+    }) => Promise<{
+        ok: boolean;
+    }>;
     templateList: () => Promise<any[]>;
     templateApply: (payload: {
         projectId: string;

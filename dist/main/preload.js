@@ -40,6 +40,11 @@ const electronAPI = {
     settingsGet: (payload) => electron_1.ipcRenderer.invoke('Settings.Get', payload),
     settingsSet: (payload) => electron_1.ipcRenderer.invoke('Settings.Set', payload),
     settingsCheckTeX: () => electron_1.ipcRenderer.invoke('Settings.CheckTeX'),
+    settingsGetTexSettings: () => electron_1.ipcRenderer.invoke('Settings.GetTexSettings'),
+    settingsUpdateTexSettings: (payload) => electron_1.ipcRenderer.invoke('Settings.UpdateTexSettings', payload),
+    settingsRedetectTeX: () => electron_1.ipcRenderer.invoke('Settings.RedetectTeX'),
+    settingsSetActiveDistribution: (payload) => electron_1.ipcRenderer.invoke('Settings.SetActiveDistribution', payload),
+    settingsAddCustomDistribution: (payload) => electron_1.ipcRenderer.invoke('Settings.AddCustomDistribution', payload),
     // Template APIs
     templateList: () => electron_1.ipcRenderer.invoke('Template.List'),
     templateApply: (payload) => electron_1.ipcRenderer.invoke('Template.Apply', payload),

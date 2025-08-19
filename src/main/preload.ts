@@ -45,6 +45,11 @@ export interface ElectronAPI {
   settingsGet: (payload: { key: string }) => Promise<any>;
   settingsSet: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>;
   settingsCheckTeX: () => Promise<{ found: boolean; paths: any }>;
+  settingsGetTexSettings: () => Promise<any>;
+  settingsUpdateTexSettings: (payload: { settings: any }) => Promise<{ ok: boolean }>;
+  settingsRedetectTeX: () => Promise<any>;
+  settingsSetActiveDistribution: (payload: { distributionName: string }) => Promise<{ ok: boolean }>;
+  settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => Promise<{ ok: boolean }>;
 
   // Template APIs
   templateList: () => Promise<any[]>;
@@ -115,6 +120,11 @@ const electronAPI: ElectronAPI = {
   settingsGet: (payload) => ipcRenderer.invoke('Settings.Get', payload),
   settingsSet: (payload) => ipcRenderer.invoke('Settings.Set', payload),
   settingsCheckTeX: () => ipcRenderer.invoke('Settings.CheckTeX'),
+  settingsGetTexSettings: () => ipcRenderer.invoke('Settings.GetTexSettings'),
+  settingsUpdateTexSettings: (payload: { settings: any }) => ipcRenderer.invoke('Settings.UpdateTexSettings', payload),
+  settingsRedetectTeX: () => ipcRenderer.invoke('Settings.RedetectTeX'),
+  settingsSetActiveDistribution: (payload: { distributionName: string }) => ipcRenderer.invoke('Settings.SetActiveDistribution', payload),
+  settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => ipcRenderer.invoke('Settings.AddCustomDistribution', payload),
 
   // Template APIs
   templateList: () => ipcRenderer.invoke('Template.List'),

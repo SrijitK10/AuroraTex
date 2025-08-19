@@ -291,6 +291,26 @@ class App {
     ipcMain.handle('Settings.CheckTeX', async () => {
       return await this.settingsService.checkTexInstallation();
     });
+
+    ipcMain.handle('Settings.GetTexSettings', async () => {
+      return await this.settingsService.getTexSettings();
+    });
+
+    ipcMain.handle('Settings.UpdateTexSettings', async (_, payload) => {
+      return await this.settingsService.updateTexSettings(payload.settings);
+    });
+
+    ipcMain.handle('Settings.RedetectTeX', async () => {
+      return await this.settingsService.redetectTeX();
+    });
+
+    ipcMain.handle('Settings.SetActiveDistribution', async (_, payload) => {
+      return await this.settingsService.setActiveDistribution(payload.distributionName);
+    });
+
+    ipcMain.handle('Settings.AddCustomDistribution', async (_, payload) => {
+      return await this.settingsService.addCustomDistribution(payload.name, payload.paths);
+    });
     
     // File watching handler
     ipcMain.handle('FS.StartWatching', async (_, payload) => {

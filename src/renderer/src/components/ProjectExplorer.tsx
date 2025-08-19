@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NewProjectModal } from './NewProjectModal';
+import texlabBanner from '../assets/texlab.png';
 
 interface Project {
   id: string;
@@ -71,7 +72,13 @@ export const ProjectExplorer: React.FC<ProjectExplorerProps> = ({ onProjectSelec
     <div className="h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-4xl w-full mx-auto p-8">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Offline Overleaf</h1>
+          <div className="mb-6">
+            <img 
+              src={texlabBanner} 
+              alt="TexLab" 
+              className="mx-auto h-32 w-auto"
+            />
+          </div>
           <p className="text-lg text-gray-600">
             Your personal LaTeX editor with full offline support
           </p>

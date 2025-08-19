@@ -1,5 +1,6 @@
 import React from 'react';
 import { SidebarToggle } from './CollapsibleSidebar';
+import logo from '../assets/logo.png';
 
 interface TopbarProps {
   project: { id: string; name: string };
@@ -52,17 +53,14 @@ export const Topbar: React.FC<TopbarProps> = ({
       <div className="flex items-center space-x-4">
         <button
           onClick={onBack}
-          className="p-2 rounded hover:bg-gray-100 transition-colors duration-150 text-gray-600"
+          className="p-2 rounded hover:bg-gray-100 transition-colors duration-150"
           title="Back to Projects (Esc)"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M15 19l-7-7 7-7" 
-            />
-          </svg>
+          <img 
+            src={logo} 
+            alt="TexLab Logo" 
+            className="h-8 w-auto max-w-32"
+          />
         </button>
         
         <SidebarToggle 
