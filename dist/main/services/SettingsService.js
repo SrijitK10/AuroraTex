@@ -44,7 +44,13 @@ class SettingsService {
             engineDefault: 'pdflatex',
             timeoutMs: 180000,
             maxLogSizeKB: 1024,
-            shellEscapeEnabled: false
+            shellEscapeEnabled: false, // Milestone 10: Default OFF for security
+            shellEscapeGlobalWarning: true, // Milestone 10: Show global security warnings
+            resourceLimits: {
+                enableProcessPriority: true, // Milestone 10: Lower process priority on Unix
+                maxCompileTimeMs: 180000, // Milestone 10: Hard timeout
+                autoCompileTimeoutMs: 120000 // Milestone 10: Shorter timeout for auto-compile
+            }
         };
         // Store settings
         await this.set('tex.settings', settings);

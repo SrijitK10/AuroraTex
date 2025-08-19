@@ -42,7 +42,9 @@ export declare class CompileOrchestrator extends EventEmitter {
     private processQueue;
     private executeJob;
     private copyProjectFiles;
-    private runLatexmk;
+    private runSecureLatexmk;
+    private createSanitizedEnvironment;
+    private killProcessTree;
     private parseLatexErrors;
     private updateFileStack;
     private findLineNumber;

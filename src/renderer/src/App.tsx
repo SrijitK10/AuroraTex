@@ -20,6 +20,12 @@ export interface Project {
   mainFile: string;
   createdAt: string;
   updatedAt: string;
+  settings?: {
+    engine?: 'pdflatex' | 'xelatex' | 'lualatex';
+    shellEscape?: boolean;
+    bibTool?: 'bibtex' | 'biber';
+    timeoutMs?: number;
+  };
 }
 
 export interface FileNode {

@@ -27,6 +27,13 @@ interface TeXSettings {
   timeoutMs: number;
   maxLogSizeKB: number;
   shellEscapeEnabled: boolean;
+  // Milestone 10: Enhanced security settings
+  shellEscapeGlobalWarning?: boolean;
+  resourceLimits?: {
+    enableProcessPriority: boolean;
+    maxCompileTimeMs: number;
+    autoCompileTimeoutMs: number;
+  };
 }
 
 interface SettingsModalProps {
@@ -51,7 +58,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [texSettings, setTexSettings] = useState<TeXSettings | null>(null);
   const [isLoadingTeX, setIsLoadingTeX] = useState(false);
   const [isRedetecting, setIsRedetecting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'compilation' | 'tex'>('compilation');
+  const [activeTab, setActiveTab] = useState<'compilation' | 'tex' | 'security'>('compilation');
   const [customDistributionName, setCustomDistributionName] = useState('');
   const [customPaths, setCustomPaths] = useState<Record<string, string>>({});
   const [showAddCustom, setShowAddCustom] = useState(false);
@@ -148,6 +155,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
     
     onClose();
+  };
+
+  const handleSaveTexSettings = async () => {
+    if (!texSettings) return;
+    
+    try {
+      await window.electronAPI.settingsUpdateTexSettings({ settings: texSettings });
+      console.log('Security settings saved successfully');
+    } catch (error) {
+      console.error('Failed to save security settings:', error);
+    }
   };
 
   const handleCancel = () => {
@@ -248,6 +266,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               TeX Distribution
+            </button>
+            {/* Milestone 10: Security Settings Tab */}
+            <button
+              onClick={() => setActiveTab('security')}
+              className={`px-3 py-1 text-sm rounded transition-colors ${
+                activeTab === 'security' ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Security & Limits
             </button>
           </div>
         </div>
@@ -495,6 +522,250 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Milestone 10: Security & Limits Tab */}
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <h3 className="text-sm font-medium text-yellow-800">Security Notice</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      These settings control LaTeX compilation security. Shell-escape allows LaTeX documents to execute system commands and should only be enabled for trusted documents.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Global Shell-Escape Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Shell-Escape Control</h3>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="globalShellEscape" className="text-sm font-medium text-gray-700">
+                      Global Shell-Escape Default
+                    </label>
+                    <p className="text-sm text-gray-500">
+                      Default shell-escape setting for new projects. Individual projects can override this.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="globalShellEscape"
+                      checked={texSettings?.shellEscapeEnabled || false}
+                      onChange={async (e) => {
+                        if (texSettings) {
+                          const updatedSettings = { ...texSettings, shellEscapeEnabled: e.target.checked };
+                          setTexSettings(updatedSettings);
+                          // Auto-save security settings
+                          try {
+                            await window.electronAPI.settingsUpdateTexSettings({ settings: updatedSettings });
+                          } catch (error) {
+                            console.error('Failed to save shell-escape setting:', error);
+                          }
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus-within:ring-4 focus-within:ring-red-300 ${
+                      texSettings?.shellEscapeEnabled ? 'bg-red-600' : 'bg-gray-200'
+                    }`}>
+                      <div className={`absolute top-[2px] left-[2px] bg-white border border-gray-300 rounded-full h-5 w-5 transition-transform duration-200 ease-in-out ${
+                        texSettings?.shellEscapeEnabled ? 'translate-x-full border-white' : 'translate-x-0'
+                      }`}></div>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="shellEscapeWarning" className="text-sm font-medium text-gray-700">
+                      Show Security Warnings
+                    </label>
+                    <p className="text-sm text-gray-500">
+                      Display security warnings when shell-escape is enabled for projects.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="shellEscapeWarning"
+                      checked={texSettings?.shellEscapeGlobalWarning !== false}
+                      onChange={async (e) => {
+                        if (texSettings) {
+                          const updatedSettings = { ...texSettings, shellEscapeGlobalWarning: e.target.checked };
+                          setTexSettings(updatedSettings);
+                          // Auto-save security settings
+                          try {
+                            await window.electronAPI.settingsUpdateTexSettings({ settings: updatedSettings });
+                          } catch (error) {
+                            console.error('Failed to save warning setting:', error);
+                          }
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus-within:ring-4 focus-within:ring-blue-300 ${
+                      texSettings?.shellEscapeGlobalWarning !== false ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}>
+                      <div className={`absolute top-[2px] left-[2px] bg-white border border-gray-300 rounded-full h-5 w-5 transition-transform duration-200 ease-in-out ${
+                        texSettings?.shellEscapeGlobalWarning !== false ? 'translate-x-full border-white' : 'translate-x-0'
+                      }`}></div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Resource Limits */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Resource Limits</h3>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="processPriority" className="text-sm font-medium text-gray-700">
+                      Lower Process Priority
+                    </label>
+                    <p className="text-sm text-gray-500">
+                      Reduce LaTeX process priority to limit resource usage (Unix systems only).
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="processPriority"
+                      checked={texSettings?.resourceLimits?.enableProcessPriority !== false}
+                      onChange={async (e) => {
+                        if (texSettings) {
+                          const updatedSettings = { 
+                            ...texSettings, 
+                            resourceLimits: { 
+                              ...texSettings.resourceLimits,
+                              enableProcessPriority: e.target.checked,
+                              maxCompileTimeMs: texSettings.resourceLimits?.maxCompileTimeMs || 180000,
+                              autoCompileTimeoutMs: texSettings.resourceLimits?.autoCompileTimeoutMs || 120000
+                            }
+                          };
+                          setTexSettings(updatedSettings);
+                          // Auto-save security settings
+                          try {
+                            await window.electronAPI.settingsUpdateTexSettings({ settings: updatedSettings });
+                          } catch (error) {
+                            console.error('Failed to save process priority setting:', error);
+                          }
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus-within:ring-4 focus-within:ring-blue-300 ${
+                      texSettings?.resourceLimits?.enableProcessPriority !== false ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}>
+                      <div className={`absolute top-[2px] left-[2px] bg-white border border-gray-300 rounded-full h-5 w-5 transition-transform duration-200 ease-in-out ${
+                        texSettings?.resourceLimits?.enableProcessPriority !== false ? 'translate-x-full border-white' : 'translate-x-0'
+                      }`}></div>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="maxCompileTime" className="text-sm font-medium text-gray-700">
+                      Manual Compile Timeout (seconds)
+                    </label>
+                    <input
+                      type="number"
+                      id="maxCompileTime"
+                      min="30"
+                      max="600"
+                      value={Math.round((texSettings?.resourceLimits?.maxCompileTimeMs || 180000) / 1000)}
+                      onChange={async (e) => {
+                        const timeoutMs = parseInt(e.target.value) * 1000;
+                        if (texSettings && timeoutMs >= 30000 && timeoutMs <= 600000) {
+                          const updatedSettings = { 
+                            ...texSettings, 
+                            resourceLimits: { 
+                              ...texSettings.resourceLimits,
+                              enableProcessPriority: texSettings.resourceLimits?.enableProcessPriority !== false,
+                              maxCompileTimeMs: timeoutMs,
+                              autoCompileTimeoutMs: texSettings.resourceLimits?.autoCompileTimeoutMs || 120000
+                            }
+                          };
+                          setTexSettings(updatedSettings);
+                          // Auto-save after a brief delay
+                          setTimeout(async () => {
+                            try {
+                              await window.electronAPI.settingsUpdateTexSettings({ settings: updatedSettings });
+                            } catch (error) {
+                              console.error('Failed to save timeout setting:', error);
+                            }
+                          }, 500);
+                        }
+                      }}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="autoCompileTimeout" className="text-sm font-medium text-gray-700">
+                      Auto-compile Timeout (seconds)
+                    </label>
+                    <input
+                      type="number"
+                      id="autoCompileTimeout"
+                      min="30"
+                      max="300"
+                      value={Math.round((texSettings?.resourceLimits?.autoCompileTimeoutMs || 120000) / 1000)}
+                      onChange={async (e) => {
+                        const timeoutMs = parseInt(e.target.value) * 1000;
+                        if (texSettings && timeoutMs >= 30000 && timeoutMs <= 300000) {
+                          const updatedSettings = { 
+                            ...texSettings, 
+                            resourceLimits: { 
+                              ...texSettings.resourceLimits,
+                              enableProcessPriority: texSettings.resourceLimits?.enableProcessPriority !== false,
+                              maxCompileTimeMs: texSettings.resourceLimits?.maxCompileTimeMs || 180000,
+                              autoCompileTimeoutMs: timeoutMs
+                            }
+                          };
+                          setTexSettings(updatedSettings);
+                          // Auto-save after a brief delay
+                          setTimeout(async () => {
+                            try {
+                              await window.electronAPI.settingsUpdateTexSettings({ settings: updatedSettings });
+                            } catch (error) {
+                              console.error('Failed to save auto-compile timeout setting:', error);
+                            }
+                          }, 500);
+                        }
+                      }}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-800">Security Best Practices</h3>
+                      <ul className="text-sm text-blue-700 mt-1 space-y-1">
+                        <li>• Keep shell-escape disabled for untrusted documents</li>
+                        <li>• Shorter timeouts prevent runaway compilations</li>
+                        <li>• Process priority limits prevent system slowdowns</li>
+                        <li>• Review documents before enabling shell-escape</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

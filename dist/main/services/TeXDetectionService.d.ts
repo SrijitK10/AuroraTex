@@ -23,6 +23,12 @@ export interface TeXSettings {
     timeoutMs: number;
     maxLogSizeKB: number;
     shellEscapeEnabled: boolean;
+    shellEscapeGlobalWarning?: boolean;
+    resourceLimits?: {
+        enableProcessPriority: boolean;
+        maxCompileTimeMs: number;
+        autoCompileTimeoutMs: number;
+    };
 }
 export declare class TeXDetectionService {
     private bundledPath;

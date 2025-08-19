@@ -29,6 +29,13 @@ export interface TeXSettings {
   timeoutMs: number;
   maxLogSizeKB: number;
   shellEscapeEnabled: boolean;
+  // Milestone 10: Enhanced security settings
+  shellEscapeGlobalWarning?: boolean;
+  resourceLimits?: {
+    enableProcessPriority: boolean;
+    maxCompileTimeMs: number;
+    autoCompileTimeoutMs: number;
+  };
 }
 
 export class TeXDetectionService {

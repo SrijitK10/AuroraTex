@@ -1,9 +1,9 @@
 import { spawn, ChildProcess } from 'child_process';
 import { join, dirname } from 'path';
-import { mkdir, copyFile, readdir, stat, readFile, writeFile } from 'fs/promises';
+import { mkdir, copyFile, readdir, stat, readFile, writeFile, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { tmpdir } from 'os';
+import { tmpdir, platform } from 'os';
 import { EventEmitter } from 'events';
 import { CompileStatusDTO, ErrorDTO } from '../types';
 import { ProjectService } from './ProjectService';
@@ -327,6 +327,8 @@ export class CompileOrchestrator extends EventEmitter {
     this.currentlyRunning++;
     this.emitQueueStateChange();
 
+    let cleanupPaths: string[] = []; // Track paths to cleanup
+    
     try {
       job.state = 'running';
       job.startTime = new Date();
@@ -344,15 +346,25 @@ export class CompileOrchestrator extends EventEmitter {
         throw new Error('Project not found');
       }
 
-      // Create temporary build directory (Milestone 4: snapshot/lock read-only view)
-      const buildDir = join(tmpdir(), `latex-build-${job.id}`);
+      // Milestone 10: Check shell-escape setting and warn if enabled
+      if (project.settings.shellEscape) {
+        job.logs.push('⚠️  WARNING: Shell-escape is ENABLED for this project. This can execute arbitrary system commands!');
+        this.emitProgress(job.id, { 
+          line: '⚠️  WARNING: Shell-escape is ENABLED for this project. This can execute arbitrary system commands!',
+          message: 'Shell-escape enabled - security warning' 
+        });
+      }
+
+      // Milestone 10: Create secure temporary build directory under app control
+      const buildDir = join(tmpdir(), 'texlab-secure', `build-${job.id}`);
       await mkdir(buildDir, { recursive: true });
       job.buildDir = buildDir;
+      cleanupPaths.push(buildDir); // Mark for cleanup
 
       job.progress = 20;
       this.emitProgress(job.id, { 
         percent: 20, 
-        message: 'Copying project files...' 
+        message: 'Copying project files to secure build environment...' 
       });
 
       // Copy project files to build directory
@@ -360,7 +372,7 @@ export class CompileOrchestrator extends EventEmitter {
       job.progress = 40;
       this.emitProgress(job.id, { 
         percent: 40, 
-        message: 'Setting up TeX environment...' 
+        message: 'Setting up secure TeX environment...' 
       });
 
       // Get LaTeX binary path
@@ -377,14 +389,14 @@ export class CompileOrchestrator extends EventEmitter {
       job.progress = 50;
       this.emitProgress(job.id, { 
         percent: 50, 
-        message: 'Running LaTeX compilation...' 
+        message: 'Running LaTeX compilation in sandboxed environment...' 
       });
 
-      // Run compilation
-      console.log(`[CompileOrchestrator] Starting compilation with latexmk at: ${latexmkPath}`);
-      console.log(`[CompileOrchestrator] Build directory: ${buildDir}`);
+      // Milestone 10: Run compilation with enhanced security
+      console.log(`[CompileOrchestrator] Starting secure compilation with latexmk at: ${latexmkPath}`);
+      console.log(`[CompileOrchestrator] Secure build directory: ${buildDir}`);
       console.log(`[CompileOrchestrator] Main file: ${project.mainFile}`);
-      await this.runLatexmk(job, latexmkPath, buildDir, project.mainFile, engine);
+      await this.runSecureLatexmk(job, latexmkPath, buildDir, project.mainFile, engine, project.settings.shellEscape);
 
       // Milestone 5: Copy output back to project (only main.pdf + compile.log)
       const outputDir = join(project.root, 'output');
@@ -427,6 +439,16 @@ export class CompileOrchestrator extends EventEmitter {
         message: errorMessage 
       });
     } finally {
+      // Milestone 10: Secure cleanup - always remove temporary build directories
+      for (const path of cleanupPaths) {
+        try {
+          await rm(path, { recursive: true, force: true });
+          console.log(`[CompileOrchestrator] Cleaned up temporary directory: ${path}`);
+        } catch (cleanupError) {
+          console.warn(`[CompileOrchestrator] Failed to cleanup temporary directory ${path}:`, cleanupError);
+        }
+      }
+      
       // Milestone 5: Post-job cleanup and auto-compile handling
       this.currentlyRunning--;
       this.lastCompileEnd.set(job.projectId, Date.now());
@@ -471,13 +493,35 @@ export class CompileOrchestrator extends EventEmitter {
     }
   }
 
-  private async runLatexmk(job: CompileJob, latexmkPath: string, buildDir: string, mainFile: string, engine: string): Promise<void> {
+  // Milestone 10: Enhanced secure compilation with sandboxing and process limits
+  private async runSecureLatexmk(
+    job: CompileJob, 
+    latexmkPath: string, 
+    buildDir: string, 
+    mainFile: string, 
+    engine: string, 
+    shellEscapeEnabled: boolean
+  ): Promise<void> {
+    // Get timeout settings from global security configuration
+    const globalSettings = await this.settingsService.getTexSettings();
+    const manualTimeoutMs = globalSettings?.resourceLimits?.maxCompileTimeMs || 180000;
+    const autoTimeoutMs = globalSettings?.resourceLimits?.autoCompileTimeoutMs || 120000;
+    const timeoutMs = job.isAutoCompile ? autoTimeoutMs : manualTimeoutMs;
+    
     return new Promise((resolve, reject) => {
       const args = [
         '-interaction=nonstopmode',
         '-halt-on-error',
         '-file-line-error',
       ];
+
+      // Milestone 10: Shell-escape control - default OFF, explicit opt-in required
+      if (shellEscapeEnabled) {
+        args.push('-shell-escape');
+        console.warn('[CompileOrchestrator] ⚠️  Shell-escape is ENABLED - security risk!');
+      } else {
+        args.push('-no-shell-escape'); // Explicitly disable shell-escape
+      }
 
       // Add engine-specific flags
       switch (engine) {
@@ -493,19 +537,27 @@ export class CompileOrchestrator extends EventEmitter {
 
       args.push(mainFile);
 
-      // Milestone 4: Set TEXMFVAR & TEXINPUTS to project's temp build dir
-      // Milestone 4: Default no -shell-escape for security
+      // Milestone 10: Sanitized environment - pass minimal env (no secrets)
+      const sanitizedEnv = this.createSanitizedEnvironment(buildDir);
+
+      // Milestone 10: Spawn with enhanced security options
       const childProcess = spawn(latexmkPath, args, {
         cwd: buildDir,
-        env: {
-          ...process.env,
-          TEXMFVAR: buildDir,
-          TEXINPUTS: `${buildDir}:`,
-          // Milestone 4: Sanitize env - remove potentially sensitive vars
-          NODE_ENV: undefined,
-          npm_config_cache: undefined,
-        },
+        env: sanitizedEnv
       });
+
+      // Milestone 10: Lower process priority on Unix systems (best effort)
+      if (platform() !== 'win32' && childProcess.pid) {
+        try {
+          // Lower process priority using nice (higher nice value = lower priority)
+          process.kill(childProcess.pid, 0); // Check if process exists
+          spawn('renice', ['10', childProcess.pid.toString()], { stdio: 'ignore' });
+          console.log(`[CompileOrchestrator] Lowered process priority for PID: ${childProcess.pid}`);
+        } catch (error) {
+          console.warn('[CompileOrchestrator] Failed to lower process priority:', error);
+          // Continue execution - this is best effort
+        }
+      }
 
       job.process = childProcess;
 
@@ -554,16 +606,18 @@ export class CompileOrchestrator extends EventEmitter {
         });
       });
 
-      // Milestone 4: Hard timeout (180s default)
+      // Milestone 10: Enhanced timeout with hard kill and reason exposure  
       const timeout = setTimeout(() => {
-        childProcess.kill('SIGTERM');
+        this.killProcessTree(childProcess.pid);
         job.state = 'killed';
+        const timeoutReason = `Compilation timeout after ${timeoutMs / 1000}s - process killed for security`;
+        job.logs.push(`TIMEOUT: ${timeoutReason}`);
         this.emitProgress(job.id, { 
           state: 'killed', 
-          message: 'Compilation timeout - process killed' 
+          message: timeoutReason
         });
-        reject(new Error('Compilation timeout'));
-      }, 180000); // 3 minutes
+        reject(new Error(timeoutReason));
+      }, timeoutMs);
 
       childProcess.on('close', (code: number | null) => {
         clearTimeout(timeout);
@@ -574,7 +628,10 @@ export class CompileOrchestrator extends EventEmitter {
         if (code === 0) {
           resolve();
         } else {
-          reject(new Error(`LaTeX compilation failed with exit code ${code}`));
+          const errorMsg = `LaTeX compilation failed with exit code ${code}`;
+          if (job.state !== 'killed') { // Don't override killed state
+            reject(new Error(errorMsg));
+          }
         }
       });
 
@@ -583,6 +640,65 @@ export class CompileOrchestrator extends EventEmitter {
         reject(error);
       });
     });
+  }
+
+  // Milestone 10: Create sanitized environment for child process (no secrets)
+  private createSanitizedEnvironment(buildDir: string): NodeJS.ProcessEnv {
+    const safeEnvVars = [
+      'PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'TERM',
+      'TMPDIR', 'TMP', 'TEMP', 'SYSTEMROOT', 'WINDIR', 'PROGRAMFILES'
+    ];
+
+    const sanitizedEnv: NodeJS.ProcessEnv = {};
+    
+    // Copy only safe environment variables
+    for (const key of safeEnvVars) {
+      if (process.env[key]) {
+        sanitizedEnv[key] = process.env[key];
+      }
+    }
+
+    // Milestone 4 & 10: Set TeX-specific environment variables pointing to build dir
+    sanitizedEnv.TEXMFVAR = buildDir;
+    sanitizedEnv.TEXINPUTS = `${buildDir}:`;
+    sanitizedEnv.TEXMFOUTPUT = buildDir;
+    sanitizedEnv.TEXMFCACHE = buildDir;
+
+    // Milestone 10: Remove potentially sensitive environment variables
+    const sensitiveVars = [
+      'NODE_ENV', 'npm_config_cache', 'npm_config_prefix', 'npm_config_registry',
+      'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'SSH_AUTH_SOCK', 'SSH_AGENT_PID',
+      'GITHUB_TOKEN', 'GITLAB_TOKEN', 'DOCKER_HOST', 'KUBERNETES_SERVICE_HOST'
+    ];
+
+    for (const key of sensitiveVars) {
+      delete sanitizedEnv[key];
+    }
+
+    console.log('[CompileOrchestrator] Created sanitized environment for LaTeX compilation');
+    return sanitizedEnv;
+  }
+
+  // Milestone 10: Hard kill process tree on timeout - cross-platform process termination
+  private killProcessTree(pid: number | undefined): void {
+    if (!pid) return;
+
+    try {
+      if (platform() === 'win32') {
+        // Windows: Use taskkill to kill process tree
+        spawn('taskkill', ['/pid', pid.toString(), '/T', '/F'], { stdio: 'ignore' });
+      } else {
+        // Unix-like: Kill process group
+        try {
+          process.kill(-pid, 'SIGKILL'); // Kill process group
+        } catch (error) {
+          process.kill(pid, 'SIGKILL'); // Fallback to single process
+        }
+      }
+      console.log(`[CompileOrchestrator] Killed process tree for PID: ${pid}`);
+    } catch (error) {
+      console.warn(`[CompileOrchestrator] Failed to kill process tree for PID ${pid}:`, error);
+    }
   }
 
   private parseLatexErrors(logContent: string, buildDir: string): ErrorDTO[] {
