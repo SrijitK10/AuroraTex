@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FileNode {
   name: string;
@@ -9,7 +9,7 @@ interface FileNode {
   children?: FileNode[];
 }
 
-interface FileTreeProps {
+interface VirtualizedFileTreeProps {
   files: FileNode[];
   projectId: string;
   onFileSelect: (path: string) => void;
@@ -18,6 +18,8 @@ interface FileTreeProps {
   onFileDelete?: (path: string) => void;
   onFileRename?: (oldPath: string, newPath: string) => void;
   onQuickFileSearch?: () => void; // Milestone 13: Quick File Search
+  maxVisibleItems?: number; // For virtualization
+  itemHeight?: number; // Fixed height per item
 }
 
 interface ContextMenuState {
@@ -28,7 +30,14 @@ interface ContextMenuState {
   isRoot?: boolean;
 }
 
-export const FileTree: React.FC<FileTreeProps> = ({ 
+interface FlatNode {
+  node: FileNode;
+  depth: number;
+  index: number;
+  isExpanded?: boolean;
+}
+
+export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({ 
   files, 
   projectId,
   onFileSelect, 
@@ -36,7 +45,9 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onFileCreate,
   onFileDelete,
   onFileRename,
-  onQuickFileSearch
+  onQuickFileSearch,
+  maxVisibleItems = 50,
+  itemHeight = 32
 }) => {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -49,9 +60,67 @@ export const FileTree: React.FC<FileTreeProps> = ({
   const [editingName, setEditingName] = useState('');
   const [creatingNode, setCreatingNode] = useState<{ parentPath: string; type: 'file' | 'directory' } | null>(null);
   const [creatingName, setCreatingName] = useState('');
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(400);
+  
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [draggedNode, setDraggedNode] = useState<FileNode | null>(null);
   const [dragOverNode, setDragOverNode] = useState<string | null>(null);
+
+  // Flatten the file tree for virtualization
+  const flattenedNodes = useMemo(() => {
+    const flattened: FlatNode[] = [];
+    
+    const flatten = (nodes: FileNode[], depth: number = 0) => {
+      nodes.forEach((node) => {
+        flattened.push({
+          node,
+          depth,
+          index: flattened.length,
+          isExpanded: expandedDirs.has(node.path)
+        });
+        
+        // Include children if directory is expanded
+        if (node.type === 'directory' && expandedDirs.has(node.path) && node.children) {
+          flatten(node.children, depth + 1);
+        }
+      });
+    };
+    
+    flatten(files);
+    return flattened;
+  }, [files, expandedDirs]);
+
+  // Calculate visible items for virtualization
+  const visibleItems = useMemo(() => {
+    const startIndex = Math.floor(scrollTop / itemHeight);
+    const endIndex = Math.min(startIndex + maxVisibleItems, flattenedNodes.length);
+    
+    return flattenedNodes.slice(startIndex, endIndex).map(item => ({
+      ...item,
+      virtualIndex: startIndex + item.index - startIndex
+    }));
+  }, [flattenedNodes, scrollTop, itemHeight, maxVisibleItems]);
+
+  // Update container height on mount and resize
+  useEffect(() => {
+    const updateHeight = () => {
+      if (scrollContainerRef.current) {
+        const rect = scrollContainerRef.current.getBoundingClientRect();
+        setContainerHeight(rect.height);
+      }
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
+
+  // Handle scroll events for virtualization
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  }, []);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -70,15 +139,17 @@ export const FileTree: React.FC<FileTreeProps> = ({
     };
   }, [contextMenu.visible]);
 
-  const toggleDirectory = (path: string) => {
-    const newExpanded = new Set(expandedDirs);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
-    }
-    setExpandedDirs(newExpanded);
-  };
+  const toggleDirectory = useCallback((path: string) => {
+    setExpandedDirs(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(path)) {
+        newExpanded.delete(path);
+      } else {
+        newExpanded.add(path);
+      }
+      return newExpanded;
+    });
+  }, []);
 
   const handleContextMenu = (e: React.MouseEvent, node: FileNode | null, isRoot = false) => {
     e.preventDefault();
@@ -268,112 +339,6 @@ export const FileTree: React.FC<FileTreeProps> = ({
     setDraggedNode(null);
   };
 
-  const renderFileNode = (node: FileNode, depth: number = 0) => {
-    const isExpanded = expandedDirs.has(node.path);
-    const paddingLeft = depth * 16;
-    const isEditing = editingNode === node.path;
-    const isDraggedOver = dragOverNode === node.path;
-    const isDragging = draggedNode?.path === node.path;
-
-    return (
-      <div key={node.path}>
-        <div
-          className={`file-tree-item relative group ${
-            node.type === 'file' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-pointer hover:bg-gray-100'
-          } ${isDraggedOver ? 'bg-blue-100 border-2 border-blue-300 border-dashed' : ''} ${
-            isDragging ? 'opacity-50' : ''
-          }`}
-          style={{ paddingLeft: `${paddingLeft + 8}px` }}
-          draggable={!isEditing}
-          onDragStart={(e) => handleDragStart(e, node)}
-          onDragOver={(e) => handleDragOver(e, node)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, node)}
-          onClick={() => {
-            if (isEditing) return;
-            
-            if (node.type === 'directory') {
-              toggleDirectory(node.path);
-            } else {
-              onFileSelect(node.path);
-            }
-          }}
-          onContextMenu={(e) => handleContextMenu(e, node)}
-        >
-          <div className="flex items-center space-x-2 py-1">
-            {node.type === 'directory' && (
-              <span className="text-gray-500 text-xs w-4 flex justify-center">
-                {isExpanded ? '▼' : '▶'}
-              </span>
-            )}
-            {node.type === 'file' && <span className="w-4"></span>}
-            <span className="text-gray-600 text-xs">
-              {node.type === 'directory' ? '📁' : getFileIcon(node.name)}
-            </span>
-            
-            {isEditing ? (
-              <input
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={confirmRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    confirmRename();
-                  } else if (e.key === 'Escape') {
-                    setEditingNode(null);
-                  }
-                }}
-                className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
-                autoFocus
-              />
-            ) : (
-              <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{node.name}</span>
-            )}
-          </div>
-        </div>
-        
-        {/* Show create input for this directory */}
-        {creatingNode && creatingNode.parentPath === node.path && node.type === 'directory' && isExpanded && (
-          <div
-            className="file-tree-item"
-            style={{ paddingLeft: `${paddingLeft + 24}px` }}
-          >
-            <div className="flex items-center space-x-2 py-1">
-              <span className="w-4"></span>
-              <span className="text-gray-600 text-xs">
-                {creatingNode.type === 'directory' ? '📁' : '📄'}
-              </span>
-              <input
-                type="text"
-                value={creatingName}
-                onChange={(e) => setCreatingName(e.target.value)}
-                onBlur={confirmCreate}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    confirmCreate();
-                  } else if (e.key === 'Escape') {
-                    setCreatingNode(null);
-                    setCreatingName('');
-                  }
-                }}
-                className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
-                placeholder={`New ${creatingNode.type} name`}
-                autoFocus
-              />
-            </div>
-          </div>
-        )}
-        
-        {node.type === 'directory' && isExpanded && node.children && (
-          <div>
-            {node.children.map(child => renderFileNode(child, depth + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const getFileIcon = (filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
@@ -395,11 +360,87 @@ export const FileTree: React.FC<FileTreeProps> = ({
     }
   };
 
+  const renderVirtualizedItem = (flatNode: FlatNode, index: number) => {
+    const { node, depth } = flatNode;
+    const isExpanded = expandedDirs.has(node.path);
+    const paddingLeft = depth * 16;
+    const isEditing = editingNode === node.path;
+    const isDraggedOver = dragOverNode === node.path;
+    const isDragging = draggedNode?.path === node.path;
+    const topOffset = (Math.floor(scrollTop / itemHeight) * itemHeight) + (index * itemHeight);
+
+    return (
+      <div
+        key={`${node.path}-${index}`}
+        className={`absolute w-full file-tree-item group ${
+          node.type === 'file' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-pointer hover:bg-gray-100'
+        } ${isDraggedOver ? 'bg-blue-100 border-2 border-blue-300 border-dashed' : ''} ${
+          isDragging ? 'opacity-50' : ''
+        }`}
+        style={{ 
+          top: topOffset,
+          height: itemHeight,
+          paddingLeft: `${paddingLeft + 8}px` 
+        }}
+        draggable={!isEditing}
+        onDragStart={(e) => handleDragStart(e, node)}
+        onDragOver={(e) => handleDragOver(e, node)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, node)}
+        onClick={() => {
+          if (isEditing) return;
+          
+          if (node.type === 'directory') {
+            toggleDirectory(node.path);
+          } else {
+            onFileSelect(node.path);
+          }
+        }}
+        onContextMenu={(e) => handleContextMenu(e, node)}
+      >
+        <div className="flex items-center space-x-2 py-1 h-full">
+          {node.type === 'directory' && (
+            <span className="text-gray-500 text-xs w-4 flex justify-center">
+              {isExpanded ? '▼' : '▶'}
+            </span>
+          )}
+          {node.type === 'file' && <span className="w-4"></span>}
+          <span className="text-gray-600 text-xs">
+            {node.type === 'directory' ? '📁' : getFileIcon(node.name)}
+          </span>
+          
+          {isEditing ? (
+            <input
+              type="text"
+              value={editingName}
+              onChange={(e) => setEditingName(e.target.value)}
+              onBlur={confirmRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  confirmRename();
+                } else if (e.key === 'Escape') {
+                  setEditingNode(null);
+                }
+              }}
+              className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
+              autoFocus
+            />
+          ) : (
+            <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{node.name}</span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const totalHeight = flattenedNodes.length * itemHeight;
+  const startIndex = Math.floor(scrollTop / itemHeight);
+
   return (
     <div className="h-full flex flex-col">
       <div className="p-3 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900">Files</h3>
+          <h3 className="text-sm font-medium text-gray-900">Files ({flattenedNodes.length})</h3>
           <div className="flex items-center space-x-1">
             {/* Milestone 13: Quick File Search Button */}
             {onQuickFileSearch && (
@@ -445,47 +486,57 @@ export const FileTree: React.FC<FileTreeProps> = ({
       </div>
       
       <div 
-        className="flex-1 overflow-y-auto bg-gray-50" 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto bg-gray-50 relative" 
         onContextMenu={(e) => handleContextMenu(e, null, true)}
         onDragOver={(e) => handleDragOver(e)}
         onDrop={(e) => handleDrop(e)}
+        onScroll={handleScroll}
       >
-        {files.length === 0 ? (
+        {flattenedNodes.length === 0 ? (
           <div className="p-4 text-center text-gray-500 text-sm">
             No files found
           </div>
         ) : (
-          <div className="py-2">
-            {files.map(file => renderFileNode(file))}
-            
-            {/* Show create input at root level */}
-            {creatingNode && creatingNode.parentPath === '' && (
-              <div className="file-tree-item" style={{ paddingLeft: '8px' }}>
-                <div className="flex items-center space-x-2 py-1">
-                  <span className="w-4"></span>
-                  <span className="text-gray-600 text-xs">
-                    {creatingNode.type === 'directory' ? '📁' : '📄'}
-                  </span>
-                  <input
-                    type="text"
-                    value={creatingName}
-                    onChange={(e) => setCreatingName(e.target.value)}
-                    onBlur={confirmCreate}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        confirmCreate();
-                      } else if (e.key === 'Escape') {
-                        setCreatingNode(null);
-                        setCreatingName('');
-                      }
-                    }}
-                    className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
-                    placeholder={`New ${creatingNode.type} name`}
-                    autoFocus
-                  />
-                </div>
-              </div>
-            )}
+          <div style={{ height: totalHeight, position: 'relative' }}>
+            {visibleItems.map((flatNode, index) => renderVirtualizedItem(flatNode, index))}
+          </div>
+        )}
+        
+        {/* Show create input at root level */}
+        {creatingNode && creatingNode.parentPath === '' && (
+          <div 
+            className="absolute file-tree-item bg-white border border-blue-300 z-10" 
+            style={{ 
+              top: totalHeight,
+              left: 8,
+              right: 8,
+              height: itemHeight
+            }}
+          >
+            <div className="flex items-center space-x-2 py-1 h-full">
+              <span className="w-4"></span>
+              <span className="text-gray-600 text-xs">
+                {creatingNode.type === 'directory' ? '📁' : '📄'}
+              </span>
+              <input
+                type="text"
+                value={creatingName}
+                onChange={(e) => setCreatingName(e.target.value)}
+                onBlur={confirmCreate}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    confirmCreate();
+                  } else if (e.key === 'Escape') {
+                    setCreatingNode(null);
+                    setCreatingName('');
+                  }
+                }}
+                className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
+                placeholder={`New ${creatingNode.type} name`}
+                autoFocus
+              />
+            </div>
           </div>
         )}
       </div>

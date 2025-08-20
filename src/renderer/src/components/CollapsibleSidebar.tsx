@@ -19,7 +19,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       <div
         className={`${
           isVisible ? width : 'w-0'
-        } bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden`}
+        } bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden h-full`}
       >
         {children}
       </div>

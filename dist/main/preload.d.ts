@@ -113,6 +113,11 @@ export interface ElectronAPI {
     compileGetAutoCompileDelay: () => Promise<{
         delayMs: number;
     }>;
+    compileCleanBuildDir: (payload: {
+        projectId: string;
+    }) => Promise<{
+        ok: boolean;
+    }>;
     snapshotCreate: (payload: {
         projectId: string;
         message?: string;

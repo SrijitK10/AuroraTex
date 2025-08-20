@@ -28,6 +28,11 @@ interface TopbarProps {
   onOpenBibliography?: () => void;
   // Settings modal
   onOpenSettings?: () => void;
+  // Milestone 13: Performance & UX polish props
+  onCleanBuild?: () => void;
+  onQuickFileSearch?: () => void;
+  isAutoCompileEnabled?: boolean;
+  onToggleAutoCompile?: (enabled: boolean) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -46,7 +51,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleHistoryPanel,
   onOpenSnippets,
   onOpenBibliography,
-  onOpenSettings
+  onOpenSettings,
+  onCleanBuild,
+  onQuickFileSearch,
+  isAutoCompileEnabled = false,
+  onToggleAutoCompile
 }) => {
   return (
     <div className="topbar-container">
@@ -157,17 +166,85 @@ export const Topbar: React.FC<TopbarProps> = ({
           </button>
         )}
         
-        <button
-          onClick={onCompile}
-          disabled={isCompiling}
-          className={`px-4 py-2 rounded font-medium ${
-            isCompiling
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
-        >
-          {isCompiling ? 'Compiling...' : 'Compile'}
-        </button>
+        {/* Milestone 13: Quick File Search */}
+        {onQuickFileSearch && (
+          <button
+            onClick={onQuickFileSearch}
+            className="px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center space-x-1"
+            title="Quick File Search (Cmd/Ctrl+P)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="hidden md:inline">Search</span>
+          </button>
+        )}
+        
+        {/* Milestone 13: Auto-compile toggle */}
+        {onToggleAutoCompile && (
+          <button
+            onClick={() => onToggleAutoCompile(!isAutoCompileEnabled)}
+            className={`px-3 py-2 rounded border flex items-center space-x-1 ${
+              isAutoCompileEnabled
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+            title={`Auto-compile: ${isAutoCompileEnabled ? 'ON' : 'OFF'} (Cmd/Ctrl+Shift+B)`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="hidden md:inline">Auto</span>
+          </button>
+        )}
+        
+        {/* Milestone 13: Build buttons with dropdown */}
+        <div className="relative group">
+          <button
+            onClick={onCompile}
+            disabled={isCompiling}
+            className={`px-4 py-2 rounded-l font-medium ${
+              isCompiling
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
+            title="Build Project (Cmd/Ctrl+B)"
+          >
+            {isCompiling ? 'Compiling...' : 'Compile'}
+          </button>
+          
+          {onCleanBuild && (
+            <>
+              <button
+                className={`px-2 py-2 rounded-r border-l border-green-500 font-medium ${
+                  isCompiling
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+                disabled={isCompiling}
+                title="Build options"
+              >
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              
+              {/* Dropdown menu */}
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                <button
+                  onClick={onCleanBuild}
+                  disabled={isCompiling}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Clean Build</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         
         <button
           onClick={onToggleLog}

@@ -22,6 +22,86 @@ export class SettingsService {
     }
   }
 
+  // Milestone 13: Cold-start cache functionality
+  async getLastOpenedProject(): Promise<string | null> {
+    return await this.get('app.lastOpenedProject');
+  }
+
+  async setLastOpenedProject(projectId: string): Promise<{ ok: boolean }> {
+    return await this.set('app.lastOpenedProject', projectId);
+  }
+
+  async getRecentProjects(): Promise<Array<{ id: string; name: string; lastOpened: number }>> {
+    const recent = await this.get('app.recentProjects');
+    return recent || [];
+  }
+
+  async addToRecentProjects(projectId: string, projectName: string): Promise<{ ok: boolean }> {
+    const recent = await this.getRecentProjects();
+    const existing = recent.findIndex(p => p.id === projectId);
+    
+    const projectEntry = {
+      id: projectId,
+      name: projectName,
+      lastOpened: Date.now()
+    };
+    
+    if (existing >= 0) {
+      // Update existing entry
+      recent[existing] = projectEntry;
+    } else {
+      // Add new entry
+      recent.unshift(projectEntry);
+    }
+    
+    // Keep only last 10 recent projects
+    const trimmed = recent.slice(0, 10);
+    
+    // Sort by last opened (most recent first)
+    trimmed.sort((a, b) => b.lastOpened - a.lastOpened);
+    
+    return await this.set('app.recentProjects', trimmed);
+  }
+
+  // Milestone 13: Incremental build settings
+  async getIncrementalBuildSettings(): Promise<{
+    enabled: boolean;
+    preserveTempDir: boolean;
+    cleanBuildThreshold: number; // Hours after which to force clean build
+  }> {
+    const settings = await this.get('compile.incrementalBuild');
+    return settings || {
+      enabled: true,
+      preserveTempDir: true,
+      cleanBuildThreshold: 24 // 24 hours default
+    };
+  }
+
+  async updateIncrementalBuildSettings(settings: {
+    enabled: boolean;
+    preserveTempDir: boolean;
+    cleanBuildThreshold: number;
+  }): Promise<{ ok: boolean }> {
+    return await this.set('compile.incrementalBuild', settings);
+  }
+
+  // Milestone 13: Editor state persistence
+  async getEditorState(projectId: string): Promise<{
+    openTabs?: Array<{ path: string; isActive: boolean }>;
+    scrollPositions?: Record<string, { line: number; column: number }>;
+    foldedRegions?: Record<string, Array<{ from: number; to: number }>>;
+  } | null> {
+    return await this.get(`editor.state.${projectId}`);
+  }
+
+  async saveEditorState(projectId: string, state: {
+    openTabs?: Array<{ path: string; isActive: boolean }>;
+    scrollPositions?: Record<string, { line: number; column: number }>;
+    foldedRegions?: Record<string, Array<{ from: number; to: number }>>;
+  }): Promise<{ ok: boolean }> {
+    return await this.set(`editor.state.${projectId}`, state);
+  }
+
   async get(key: string): Promise<any> {
     return this.inMemoryDB.get(key) || null;
   }

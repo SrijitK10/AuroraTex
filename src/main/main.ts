@@ -163,7 +163,7 @@ class App {
 
     // Compile IPC handlers
     ipcMain.handle('Compile.Run', async (_, payload) => {
-      return await this.compileOrchestrator.run(payload.projectId, payload.engine, payload.mainFile, payload.isAutoCompile);
+      return await this.compileOrchestrator.run(payload.projectId, payload.engine, payload.mainFile, payload.isAutoCompile, payload.forceClean);
     });
 
     ipcMain.handle('Compile.Status', async (_, payload) => {
@@ -176,6 +176,11 @@ class App {
 
     ipcMain.handle('Compile.Cancel', async (_, payload) => {
       return this.compileOrchestrator.cancel(payload.jobId);
+    });
+
+    // Milestone 13: Clean build directory
+    ipcMain.handle('Compile.CleanBuildDir', async (_, payload) => {
+      return await this.compileOrchestrator.cleanBuildDir(payload.projectId);
     });
 
     // Milestone 5: Queue state and auto-compile handlers
@@ -310,6 +315,39 @@ class App {
 
     ipcMain.handle('Settings.AddCustomDistribution', async (_, payload) => {
       return await this.settingsService.addCustomDistribution(payload.name, payload.paths);
+    });
+
+    // Milestone 13: Cold-start cache handlers
+    ipcMain.handle('Settings.GetLastOpenedProject', async () => {
+      return await this.settingsService.getLastOpenedProject();
+    });
+
+    ipcMain.handle('Settings.SetLastOpenedProject', async (_, payload) => {
+      return await this.settingsService.setLastOpenedProject(payload.projectId);
+    });
+
+    ipcMain.handle('Settings.GetRecentProjects', async () => {
+      return await this.settingsService.getRecentProjects();
+    });
+
+    ipcMain.handle('Settings.AddToRecentProjects', async (_, payload) => {
+      return await this.settingsService.addToRecentProjects(payload.projectId, payload.projectName);
+    });
+
+    ipcMain.handle('Settings.GetIncrementalBuildSettings', async () => {
+      return await this.settingsService.getIncrementalBuildSettings();
+    });
+
+    ipcMain.handle('Settings.UpdateIncrementalBuildSettings', async (_, payload) => {
+      return await this.settingsService.updateIncrementalBuildSettings(payload.settings);
+    });
+
+    ipcMain.handle('Settings.GetEditorState', async (_, payload) => {
+      return await this.settingsService.getEditorState(payload.projectId);
+    });
+
+    ipcMain.handle('Settings.SaveEditorState', async (_, payload) => {
+      return await this.settingsService.saveEditorState(payload.projectId, payload.state);
     });
     
     // File watching handler

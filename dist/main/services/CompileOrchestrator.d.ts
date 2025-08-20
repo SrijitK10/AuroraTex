@@ -14,6 +14,9 @@ export declare class CompileOrchestrator extends EventEmitter {
     private pendingAutoCompile;
     private autoCompileDebounceMs;
     private autoCompileMinInterval;
+    private persistentBuildDirs;
+    private lastCleanBuild;
+    private buildDirModTimes;
     constructor();
     setAutoCompileDelay(delayMs: number): void;
     getAutoCompileDelay(): number;
@@ -28,7 +31,12 @@ export declare class CompileOrchestrator extends EventEmitter {
             isAutoCompile: boolean;
         }>;
     };
-    run(projectId: string, engine?: string, mainFile?: string, isAutoCompile?: boolean): Promise<{
+    private shouldUseIncrementalBuild;
+    private getOrCreatePersistentBuildDir;
+    cleanBuildDir(projectId: string): Promise<{
+        ok: boolean;
+    }>;
+    run(projectId: string, engine?: string, mainFile?: string, isAutoCompile?: boolean, forceClean?: boolean): Promise<{
         jobId: string;
     }>;
     private writeFullLogFile;

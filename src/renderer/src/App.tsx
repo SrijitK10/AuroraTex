@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProjectExplorer } from './components/ProjectExplorer';
 import { FileTree } from './components/FileTree';
+import { VirtualizedFileTree } from './components/VirtualizedFileTree';
+import { QuickFileSearch } from './components/QuickFileSearch';
 import { Editor, EditorRef } from './components/Editor';
 import { PDFViewer } from './components/PDFViewer';
 import { LogPanel } from './components/LogPanel';
@@ -105,14 +107,41 @@ function App() {
   const [selectedBibFile, setSelectedBibFile] = useState<string>('references.bib');
   const [managedFiles, setManagedFiles] = useState<Set<string>>(new Set()); // Files being managed by editors
 
+  // Milestone 13: Performance & UX Polish state
+  const [showQuickFileSearch, setShowQuickFileSearch] = useState(false);
+  const [useVirtualizedFileTree, setUseVirtualizedFileTree] = useState(false);
+  const [isIncrementalBuildEnabled, setIsIncrementalBuildEnabled] = useState(true);
+
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Cmd+B (Mac) or Ctrl+B (Windows/Linux) to toggle sidebar
+      // Milestone 13: Build shortcut - Cmd+B (Mac) or Ctrl+B (Windows/Linux)
       if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
+        event.preventDefault();
+        if (currentProject) {
+          compileProject();
+        }
+      }
+      
+      // Milestone 13: Toggle Auto-compile - Cmd+Shift+B or Ctrl+Shift+B
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'B') {
+        event.preventDefault();
+        handleToggleAutoCompile(!isAutoCompileEnabled);
+      }
+      
+      // Milestone 13: Quick file search - Cmd+P (Mac) or Ctrl+P (Windows/Linux)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'p') {
+        event.preventDefault();
+        if (currentProject) {
+          setShowQuickFileSearch(true);
+        }
+      }
+      
+      // Milestone 13: Toggle sidebar - Cmd+\ or Ctrl+\
+      if ((event.metaKey || event.ctrlKey) && event.key === '\\') {
         event.preventDefault();
         setShowSidebar(prev => !prev);
       }
@@ -135,7 +164,8 @@ function App() {
           !showLogPanel && 
           !showErrorsPanel && 
           !showHistoryPanel &&
-          !showSnippetsPalette) {
+          !showSnippetsPalette &&
+          !showQuickFileSearch) {
         event.preventDefault();
         handleEscapeBackToProjects();
       }
@@ -143,7 +173,7 @@ function App() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [openTabs]); // Include openTabs to get latest state in handleBackToProjects
+  }, [currentProject, isAutoCompileEnabled, showLogPanel, showErrorsPanel, showHistoryPanel, showSnippetsPalette, showQuickFileSearch]);
 
   // Load file tree when project changes
   useEffect(() => {
@@ -613,7 +643,7 @@ function App() {
     }
   };
 
-  const compileProject = async () => {
+  const compileProject = async (forceClean = false) => {
     if (!currentProject || isCompiling) return;
 
     setIsCompiling(true);
@@ -628,6 +658,7 @@ function App() {
     try {
       const result = await window.electronAPI.compileRun({
         projectId: currentProject.id,
+        forceClean, // Milestone 13: Support clean builds
       });
 
       // Milestone 4: Listen for live progress events
@@ -703,6 +734,39 @@ function App() {
       setCompilationStatus('error');
     }
   };
+
+  // Milestone 13: Clean build function
+  const handleCleanBuild = async () => {
+    if (!currentProject) return;
+    
+    const confirmed = window.confirm(
+      'This will delete all intermediate build files and start a clean compilation. Continue?'
+    );
+    
+    if (confirmed) {
+      try {
+        // Clean the build directory first
+        await window.electronAPI.compileCleanBuildDir({ projectId: currentProject.id });
+        console.log('Build directory cleaned for clean build');
+        
+        // Start clean compilation
+        await compileProject(true);
+      } catch (error) {
+        console.error('Failed to clean build directory:', error);
+        alert('Failed to clean build directory: ' + (error as Error).message);
+      }
+    }
+  };
+
+  // Milestone 13: Detect when to use virtualized file tree based on project size
+  useEffect(() => {
+    if (fileTree.length > 100) {
+      setUseVirtualizedFileTree(true);
+      console.log('Large project detected - using virtualized file tree');
+    } else {
+      setUseVirtualizedFileTree(false);
+    }
+  }, [fileTree]);
 
   // Milestone 5: Auto-compile and toggle functions
   const handleAutoCompile = async () => {
@@ -914,11 +978,12 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       <Topbar 
         project={currentProject}
         isCompiling={isCompiling}
-        onCompile={compileProject}
+        onCompile={() => compileProject(false)}
+        onCleanBuild={handleCleanBuild}
         onToggleLog={() => setShowLogPanel(!showLogPanel)}
         showSidebar={showSidebar}
         onToggleSidebar={() => setShowSidebar(!showSidebar)}
@@ -932,22 +997,41 @@ function App() {
         onOpenSnippets={() => setShowSnippetsPalette(true)}
         onOpenBibliography={handleOpenBibliography}
         onOpenSettings={() => setShowSettingsModal(true)}
+        onQuickFileSearch={() => setShowQuickFileSearch(true)}
+        isAutoCompileEnabled={isAutoCompileEnabled}
+        onToggleAutoCompile={handleToggleAutoCompile}
       />
       
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         <CollapsibleSidebar 
           isVisible={showSidebar}
           onToggle={() => setShowSidebar(!showSidebar)}
         >
-          <FileTree 
-            files={fileTree}
-            projectId={currentProject.id}
-            onFileSelect={openFile}
-            onRefresh={loadFileTree}
-            onFileCreate={handleFileCreate}
-            onFileDelete={handleFileDelete}
-            onFileRename={handleFileRename}
-          />
+          {useVirtualizedFileTree ? (
+            <VirtualizedFileTree 
+              files={fileTree}
+              projectId={currentProject.id}
+              onFileSelect={openFile}
+              onRefresh={loadFileTree}
+              onFileCreate={handleFileCreate}
+              onFileDelete={handleFileDelete}
+              onFileRename={handleFileRename}
+              onQuickFileSearch={() => setShowQuickFileSearch(true)}
+              maxVisibleItems={50}
+              itemHeight={32}
+            />
+          ) : (
+            <FileTree 
+              files={fileTree}
+              projectId={currentProject.id}
+              onFileSelect={openFile}
+              onRefresh={loadFileTree}
+              onFileCreate={handleFileCreate}
+              onFileDelete={handleFileDelete}
+              onFileRename={handleFileRename}
+              onQuickFileSearch={() => setShowQuickFileSearch(true)}
+            />
+          )}
         </CollapsibleSidebar>
         
         <ResizableSplitter
@@ -974,7 +1058,7 @@ function App() {
           defaultSplit={60}
           minLeft={300}
           minRight={250}
-          className="flex-1"
+          className="flex-1 min-h-0"
         />
       </div>
       
@@ -1018,6 +1102,18 @@ function App() {
           // Refresh file tree as well
           loadFileTree();
         }}
+      />
+
+      {/* Milestone 13: Quick File Search */}
+      <QuickFileSearch
+        isOpen={showQuickFileSearch}
+        onClose={() => setShowQuickFileSearch(false)}
+        files={fileTree}
+        onFileSelect={(path) => {
+          openFile(path);
+          setShowQuickFileSearch(false);
+        }}
+        projectName={currentProject?.name}
       />
 
       {/* Milestone 8: Snippets Palette */}

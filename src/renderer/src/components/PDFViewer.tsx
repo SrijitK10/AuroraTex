@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to use the bundled worker
@@ -10,25 +10,74 @@ interface PDFViewerProps {
   compilationStatus?: 'idle' | 'compiling' | 'success' | 'error';
 }
 
+interface PDFViewState {
+  currentPage: number;
+  scale: number;
+  scrollTop: number;
+  scrollLeft: number;
+}
+
 export const PDFViewer: React.FC<PDFViewerProps> = ({ 
   projectId, 
   refreshTrigger = 0, 
   compilationStatus = 'idle' 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Milestone 13: PDF state preservation for incremental refresh
+  const [savedViewState, setSavedViewState] = useState<PDFViewState | null>(null);
+  const [lastPdfModTime, setLastPdfModTime] = useState<number | null>(null);
+  const [isIncrementalRefresh, setIsIncrementalRefresh] = useState(false);
 
-  const loadPDF = async () => {
+  // Milestone 13: Save current view state for incremental refresh
+  const saveViewState = useCallback(() => {
+    if (containerRef.current) {
+      const state: PDFViewState = {
+        currentPage,
+        scale,
+        scrollTop: containerRef.current.scrollTop,
+        scrollLeft: containerRef.current.scrollLeft
+      };
+      setSavedViewState(state);
+      console.log('PDF view state saved:', state);
+    }
+  }, [currentPage, scale]);
+
+  // Milestone 13: Restore view state after incremental refresh
+  const restoreViewState = useCallback(() => {
+    if (savedViewState && containerRef.current && !loading) {
+      setTimeout(() => {
+        if (containerRef.current) {
+          setCurrentPage(savedViewState.currentPage);
+          setScale(savedViewState.scale);
+          containerRef.current.scrollTop = savedViewState.scrollTop;
+          containerRef.current.scrollLeft = savedViewState.scrollLeft;
+          console.log('PDF view state restored:', savedViewState);
+          setIsIncrementalRefresh(false);
+        }
+      }, 100); // Small delay to ensure PDF is rendered
+    }
+  }, [savedViewState, loading]);
+
+  const loadPDF = async (isIncremental = false) => {
     if (!projectId) return;
 
     try {
       setLoading(true);
       setError(null);
+      
+      // Milestone 13: Save view state before refresh if this might be incremental
+      if (isIncremental && pdfDoc) {
+        saveViewState();
+        setIsIncrementalRefresh(true);
+      }
       
       const pdfUrl = await window.electronAPI.projectOutputPath({
         projectId,
@@ -37,22 +86,39 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
 
       console.log('Loading PDF from:', pdfUrl);
       
-      // Check if file exists by trying to fetch it
+      // Check if file exists and get modification time for incremental detection
       const response = await fetch(pdfUrl);
       if (!response.ok) {
         throw new Error('PDF file not found');
       }
 
+      // Try to get last modified time for incremental refresh detection
+      const lastModified = response.headers.get('last-modified');
+      const modTime = lastModified ? new Date(lastModified).getTime() : Date.now();
+      
+      // Milestone 13: Check if this is truly an incremental change
+      const isReallyIncremental = lastPdfModTime && Math.abs(modTime - lastPdfModTime) < 5000; // Within 5 seconds
+      
       const loadingTask = pdfjsLib.getDocument(pdfUrl);
       const pdf = await loadingTask.promise;
       
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
-      setCurrentPage(1);
-      console.log('PDF loaded successfully:', pdf.numPages, 'pages');
+      setLastPdfModTime(modTime);
+      
+      // Milestone 13: Only reset page if not incremental or if page count changed
+      if (!isReallyIncremental || totalPages !== pdf.numPages) {
+        setCurrentPage(1);
+        console.log('PDF loaded - resetting to page 1 due to structural changes');
+      } else {
+        console.log('PDF loaded - preserving current page for incremental refresh');
+      }
+      
+      console.log('PDF loaded successfully:', pdf.numPages, 'pages', isReallyIncremental ? '(incremental)' : '(full refresh)');
     } catch (err) {
       console.error('Error loading PDF:', err);
       setError('PDF not found. Compile your LaTeX project first.');
+      setIsIncrementalRefresh(false);
     } finally {
       setLoading(false);
     }
@@ -120,7 +186,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   useEffect(() => {
     if (refreshTrigger > 0 && projectId) {
       console.log('PDF refresh triggered by compilation');
-      loadPDF();
+      loadPDF(true); // Mark as potentially incremental
     }
   }, [refreshTrigger, projectId]);
 
@@ -128,8 +194,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     console.log(`Scale changed to ${scale}, pdfDoc exists: ${!!pdfDoc}, currentPage: ${currentPage}`);
     if (pdfDoc && currentPage) {
       renderPage(currentPage);
+      
+      // Milestone 13: Restore view state after rendering if this was incremental
+      if (isIncrementalRefresh) {
+        restoreViewState();
+      }
     }
-  }, [pdfDoc, currentPage, scale]);
+  }, [pdfDoc, currentPage, scale, isIncrementalRefresh, restoreViewState]);
 
   // Auto-refresh every 5 seconds to pick up new PDFs (less frequent now since we have triggers)
   useEffect(() => {
@@ -202,7 +273,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
               </div>
             )}
             <button
-              onClick={loadPDF}
+              onClick={() => loadPDF(false)}
               disabled={loading}
               className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 disabled:opacity-50"
               title="Refresh PDF"
@@ -282,8 +353,14 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       </div>
 
       {/* PDF Content */}
-      <div className="flex-1 bg-gray-100">
-        <div className="h-full overflow-auto p-4">
+      <div ref={containerRef} className="flex-1 bg-gray-100 overflow-hidden">
+        <div 
+          className="h-full overflow-y-auto overflow-x-auto p-4 pdf-scroll-container" 
+          style={{ 
+            scrollbarWidth: 'auto', 
+            scrollbarColor: '#cbd5e1 #f1f5f9',
+          }}
+        >
           {loading && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -301,7 +378,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
                 </svg>
                 <p className="text-gray-600 mb-2">{error}</p>
                 <button
-                  onClick={loadPDF}
+                  onClick={() => loadPDF(false)}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Try Again
@@ -311,7 +388,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           )}
 
           {pdfDoc && !loading && !error && (
-            <div className="w-max mx-auto">
+            <div className="w-max mx-auto min-h-full">
               <canvas
                 ref={canvasRef}
                 className="shadow-lg border border-gray-300 bg-white block"

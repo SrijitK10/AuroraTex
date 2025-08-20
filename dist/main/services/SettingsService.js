@@ -17,6 +17,58 @@ class SettingsService {
             await this.set('tex.initialized', true);
         }
     }
+    // Milestone 13: Cold-start cache functionality
+    async getLastOpenedProject() {
+        return await this.get('app.lastOpenedProject');
+    }
+    async setLastOpenedProject(projectId) {
+        return await this.set('app.lastOpenedProject', projectId);
+    }
+    async getRecentProjects() {
+        const recent = await this.get('app.recentProjects');
+        return recent || [];
+    }
+    async addToRecentProjects(projectId, projectName) {
+        const recent = await this.getRecentProjects();
+        const existing = recent.findIndex(p => p.id === projectId);
+        const projectEntry = {
+            id: projectId,
+            name: projectName,
+            lastOpened: Date.now()
+        };
+        if (existing >= 0) {
+            // Update existing entry
+            recent[existing] = projectEntry;
+        }
+        else {
+            // Add new entry
+            recent.unshift(projectEntry);
+        }
+        // Keep only last 10 recent projects
+        const trimmed = recent.slice(0, 10);
+        // Sort by last opened (most recent first)
+        trimmed.sort((a, b) => b.lastOpened - a.lastOpened);
+        return await this.set('app.recentProjects', trimmed);
+    }
+    // Milestone 13: Incremental build settings
+    async getIncrementalBuildSettings() {
+        const settings = await this.get('compile.incrementalBuild');
+        return settings || {
+            enabled: true,
+            preserveTempDir: true,
+            cleanBuildThreshold: 24 // 24 hours default
+        };
+    }
+    async updateIncrementalBuildSettings(settings) {
+        return await this.set('compile.incrementalBuild', settings);
+    }
+    // Milestone 13: Editor state persistence
+    async getEditorState(projectId) {
+        return await this.get(`editor.state.${projectId}`);
+    }
+    async saveEditorState(projectId, state) {
+        return await this.set(`editor.state.${projectId}`, state);
+    }
     async get(key) {
         return this.inMemoryDB.get(key) || null;
     }

@@ -22,6 +22,8 @@ interface CompileJob {
   buildDir?: string;
   isAutoCompile?: boolean; // Milestone 5: Track auto vs manual compile
   priority?: number; // Milestone 5: Job priority (manual > auto)
+  isIncrementalBuild?: boolean; // Milestone 13: Track incremental vs clean builds
+  useExistingBuildDir?: boolean; // Milestone 13: Reuse build directory for speed
 }
 
 // Milestone 5: Circular buffer for log storage
@@ -78,6 +80,11 @@ export class CompileOrchestrator extends EventEmitter {
   private pendingAutoCompile: Map<string, boolean> = new Map(); // projectId -> needsBuild flag
   private autoCompileDebounceMs = 750; // Default 750ms debounce
   private autoCompileMinInterval = 5000; // 5 seconds minimum between auto-compiles
+
+  // Milestone 13: Incremental build management
+  private persistentBuildDirs: Map<string, string> = new Map(); // projectId -> buildDir
+  private lastCleanBuild: Map<string, number> = new Map(); // projectId -> timestamp
+  private buildDirModTimes: Map<string, Map<string, number>> = new Map(); // projectId -> file -> mtime
 
   constructor() {
     super();
@@ -180,11 +187,76 @@ export class CompileOrchestrator extends EventEmitter {
     };
   }
 
-  async run(projectId: string, engine?: string, mainFile?: string, isAutoCompile = false): Promise<{ jobId: string }> {
+  // Milestone 13: Check if incremental build is possible and beneficial
+  private async shouldUseIncrementalBuild(projectId: string): Promise<boolean> {
+    const settings = await this.settingsService.getIncrementalBuildSettings();
+    if (!settings.enabled) return false;
+
+    const lastClean = this.lastCleanBuild.get(projectId) || 0;
+    const hoursSinceClean = (Date.now() - lastClean) / (1000 * 60 * 60);
+    
+    // Force clean build if it's been too long
+    if (hoursSinceClean > settings.cleanBuildThreshold) {
+      console.log(`[CompileOrchestrator] Forcing clean build for ${projectId} - ${hoursSinceClean.toFixed(1)} hours since last clean`);
+      return false;
+    }
+
+    // Check if persistent build directory exists
+    const persistentDir = this.persistentBuildDirs.get(projectId);
+    if (!persistentDir || !existsSync(persistentDir)) {
+      console.log(`[CompileOrchestrator] No persistent build dir for ${projectId}, using clean build`);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Milestone 13: Get or create persistent build directory for incremental builds
+  private async getOrCreatePersistentBuildDir(projectId: string): Promise<string> {
+    let buildDir = this.persistentBuildDirs.get(projectId);
+    
+    if (!buildDir || !existsSync(buildDir)) {
+      // Create new persistent build directory
+      const tempBasePath = join(tmpdir(), 'overleaf-builds');
+      await mkdir(tempBasePath, { recursive: true });
+      buildDir = join(tempBasePath, `build-${projectId}-${Date.now()}`);
+      await mkdir(buildDir, { recursive: true });
+      
+      this.persistentBuildDirs.set(projectId, buildDir);
+      console.log(`[CompileOrchestrator] Created persistent build dir: ${buildDir}`);
+    }
+    
+    return buildDir;
+  }
+
+  // Milestone 13: Clean build directory for a project
+  async cleanBuildDir(projectId: string): Promise<{ ok: boolean }> {
+    try {
+      const buildDir = this.persistentBuildDirs.get(projectId);
+      if (buildDir && existsSync(buildDir)) {
+        await rm(buildDir, { recursive: true, force: true });
+        console.log(`[CompileOrchestrator] Cleaned build directory: ${buildDir}`);
+      }
+      
+      this.persistentBuildDirs.delete(projectId);
+      this.buildDirModTimes.delete(projectId);
+      this.lastCleanBuild.set(projectId, Date.now());
+      
+      return { ok: true };
+    } catch (error) {
+      console.error(`[CompileOrchestrator] Failed to clean build dir for ${projectId}:`, error);
+      return { ok: false };
+    }
+  }
+
+  async run(projectId: string, engine?: string, mainFile?: string, isAutoCompile = false, forceClean = false): Promise<{ jobId: string }> {
     const project = await this.projectService.getById(projectId);
     if (!project) {
       throw new Error('Project not found');
     }
+
+    // Milestone 13: Determine if this should be an incremental build
+    const useIncremental = !forceClean && await this.shouldUseIncrementalBuild(projectId);
 
     const jobId = uuidv4();
     const job: CompileJob = {
@@ -196,6 +268,8 @@ export class CompileOrchestrator extends EventEmitter {
       errors: [],
       isAutoCompile, // Milestone 5: Track auto vs manual compile
       priority: isAutoCompile ? 2 : 1, // Milestone 5: Manual jobs have higher priority
+      isIncrementalBuild: useIncremental, // Milestone 13: Track incremental builds
+      useExistingBuildDir: useIncremental, // Milestone 13: Reuse build directory
     };
 
     this.jobs.set(jobId, job);
@@ -355,11 +429,30 @@ export class CompileOrchestrator extends EventEmitter {
         });
       }
 
-      // Milestone 10: Create secure temporary build directory under app control
-      const buildDir = join(tmpdir(), 'texlab-secure', `build-${job.id}`);
-      await mkdir(buildDir, { recursive: true });
+      // Milestone 10 & 13: Create build directory (incremental or secure temp)
+      let buildDir: string;
+      
+      if (job.useExistingBuildDir) {
+        // Milestone 13: Use persistent build directory for incremental builds
+        buildDir = await this.getOrCreatePersistentBuildDir(job.projectId);
+        job.logs.push(`🔄 Using incremental build directory: ${buildDir}`);
+        this.emitProgress(job.id, { 
+          line: `🔄 Using incremental build directory for faster compilation`,
+          message: 'Using incremental build directory' 
+        });
+      } else {
+        // Milestone 10: Create secure temporary build directory under app control
+        buildDir = join(tmpdir(), 'texlab-secure', `build-${job.id}`);
+        await mkdir(buildDir, { recursive: true });
+        cleanupPaths.push(buildDir); // Mark for cleanup only if not persistent
+        job.logs.push(`🗂️  Created clean build directory: ${buildDir}`);
+        this.emitProgress(job.id, { 
+          line: `🗂️  Created clean build directory for fresh compilation`,
+          message: 'Created clean build directory' 
+        });
+      }
+      
       job.buildDir = buildDir;
-      cleanupPaths.push(buildDir); // Mark for cleanup
 
       job.progress = 20;
       this.emitProgress(job.id, { 
