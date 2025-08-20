@@ -166,6 +166,14 @@ export interface ElectronAPI {
     }) => Promise<{
         ok: boolean;
     }>;
+    settingsGetAutoCompileEnabled: () => Promise<{
+        enabled: boolean;
+    }>;
+    settingsSetAutoCompileEnabled: (payload: {
+        enabled: boolean;
+    }) => Promise<{
+        ok: boolean;
+    }>;
     templateList: () => Promise<any[]>;
     templateApply: (payload: {
         projectId: string;

@@ -142,8 +142,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSave = async () => {
-    onToggleAutoCompile(localAutoCompileEnabled);
-    onAutoCompileDelayChange(localAutoCompileDelay);
+    // Auto-compile setting and delay are already saved immediately when changed
     
     // Save TeX settings if they were modified
     if (texSettings) {
@@ -178,6 +177,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue >= 100 && numValue <= 10000) {
       setLocalAutoCompileDelay(numValue);
+      // Immediately apply the delay change to the parent
+      onAutoCompileDelayChange(numValue);
     }
   };
 
@@ -295,7 +296,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <button
                   id="autoCompile"
-                  onClick={() => setLocalAutoCompileEnabled(!localAutoCompileEnabled)}
+                  onClick={() => {
+                    const newValue = !localAutoCompileEnabled;
+                    setLocalAutoCompileEnabled(newValue);
+                    // Immediately call the parent function to update the app state
+                    onToggleAutoCompile(newValue);
+                  }}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     localAutoCompileEnabled ? 'bg-blue-600' : 'bg-gray-200'
                   }`}

@@ -52,6 +52,9 @@ export interface ElectronAPI {
   settingsRedetectTeX: () => Promise<any>;
   settingsSetActiveDistribution: (payload: { distributionName: string }) => Promise<{ ok: boolean }>;
   settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => Promise<{ ok: boolean }>;
+  // Auto-compile settings
+  settingsGetAutoCompileEnabled: () => Promise<{ enabled: boolean }>;
+  settingsSetAutoCompileEnabled: (payload: { enabled: boolean }) => Promise<{ ok: boolean }>;
 
   // Template APIs
   templateList: () => Promise<any[]>;
@@ -129,6 +132,9 @@ const electronAPI: ElectronAPI = {
   settingsRedetectTeX: () => ipcRenderer.invoke('Settings.RedetectTeX'),
   settingsSetActiveDistribution: (payload: { distributionName: string }) => ipcRenderer.invoke('Settings.SetActiveDistribution', payload),
   settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => ipcRenderer.invoke('Settings.AddCustomDistribution', payload),
+  // Auto-compile settings
+  settingsGetAutoCompileEnabled: () => ipcRenderer.invoke('Settings.GetAutoCompileEnabled'),
+  settingsSetAutoCompileEnabled: (payload) => ipcRenderer.invoke('Settings.SetAutoCompileEnabled', payload),
 
   // Template APIs
   templateList: () => ipcRenderer.invoke('Template.List'),

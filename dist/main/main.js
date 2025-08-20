@@ -152,6 +152,12 @@ class App {
             return this.compileOrchestrator.getQueueState();
         });
         electron_1.ipcMain.handle('Compile.TriggerAutoCompile', async (_, payload) => {
+            // Check if auto-compile is enabled before triggering
+            const isEnabled = await this.settingsService.get('autoCompileEnabled') || false;
+            if (!isEnabled) {
+                console.log(`[Main] Auto-compile skipped for project ${payload.projectId} - auto-compile is disabled`);
+                return { skipped: true, reason: 'auto-compile disabled' };
+            }
             return this.compileOrchestrator.triggerAutoCompile(payload.projectId);
         });
         // Auto-compile delay settings
@@ -263,6 +269,14 @@ class App {
         });
         electron_1.ipcMain.handle('Settings.SetLastOpenedProject', async (_, payload) => {
             return await this.settingsService.setLastOpenedProject(payload.projectId);
+        });
+        // Auto-compile settings handlers
+        electron_1.ipcMain.handle('Settings.GetAutoCompileEnabled', async () => {
+            return { enabled: await this.settingsService.get('autoCompileEnabled') || false };
+        });
+        electron_1.ipcMain.handle('Settings.SetAutoCompileEnabled', async (_, payload) => {
+            await this.settingsService.set('autoCompileEnabled', payload.enabled);
+            return { ok: true };
         });
         electron_1.ipcMain.handle('Settings.GetRecentProjects', async () => {
             return await this.settingsService.getRecentProjects();

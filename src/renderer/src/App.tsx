@@ -804,8 +804,11 @@ function App() {
           if (data.state === 'success') {
             setIsCompiling(false);
             setCompilationStatus('success');
-            console.log('✅ Auto-compilation successful - refreshing PDF');
-            setPdfRefreshTrigger(prev => prev + 1);
+            console.log('✅ Auto-compilation successful - refreshing PDF in 500ms');
+            setTimeout(() => {
+              setPdfRefreshTrigger(prev => prev + 1);
+              console.log('PDF refresh triggered after 500ms delay (auto-compile)');
+            }, 500);
             // Milestone 6: Fetch and process errors for auto-compile too
             fetchAndProcessErrors(data.jobId || result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
@@ -829,9 +832,24 @@ function App() {
     }
   };
 
-  const handleToggleAutoCompile = (enabled: boolean) => {
+  const handleToggleAutoCompile = async (enabled: boolean) => {
     setIsAutoCompileEnabled(enabled);
     console.log('Auto-compile mode:', enabled ? 'enabled' : 'disabled');
+    
+    // Reset compilation state when toggling auto-compile to prevent stuck states
+    if (enabled) {
+      console.log('Resetting compilation state for auto-compile enablement');
+      setIsCompiling(false);
+      setCompilationStatus('idle');
+    }
+    
+    // Save the setting persistently
+    try {
+      await window.electronAPI.settingsSetAutoCompileEnabled({ enabled });
+      console.log('Auto-compile setting saved:', enabled);
+    } catch (error) {
+      console.error('Failed to save auto-compile setting:', error);
+    }
     
     // If enabling auto-compile, trigger an immediate compilation to test
     if (enabled && currentProject) {
@@ -863,7 +881,18 @@ function App() {
       }
     };
 
+    const loadAutoCompileEnabled = async () => {
+      try {
+        const result = await window.electronAPI.settingsGetAutoCompileEnabled();
+        setIsAutoCompileEnabled(result.enabled);
+        console.log('Loaded auto-compile enabled state:', result.enabled);
+      } catch (error) {
+        console.error('Failed to load auto-compile enabled state:', error);
+      }
+    };
+
     loadAutoCompileDelay();
+    loadAutoCompileEnabled();
   }, []);
 
   const activeTab = openTabs.find(tab => tab.id === activeTabId);
@@ -998,8 +1027,6 @@ function App() {
         onOpenBibliography={handleOpenBibliography}
         onOpenSettings={() => setShowSettingsModal(true)}
         onQuickFileSearch={() => setShowQuickFileSearch(true)}
-        isAutoCompileEnabled={isAutoCompileEnabled}
-        onToggleAutoCompile={handleToggleAutoCompile}
       />
       
       <div className="flex-1 flex min-h-0 overflow-hidden">

@@ -23,10 +23,17 @@ export interface ElectronAPI {
   fsStopWatching: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
 
   // Compile APIs
-  compileRun: (payload: { projectId: string; engine?: string; mainFile?: string }) => Promise<{ jobId: string }>;
+  compileRun: (payload: { projectId: string; engine?: string; mainFile?: string; isAutoCompile?: boolean }) => Promise<{ jobId: string }>;
   compileStatus: (payload: { jobId: string }) => Promise<any>;
   compileErrors: (payload: { jobId: string }) => Promise<any[]>;
   compileCancel: (payload: { jobId: string }) => Promise<{ ok: boolean }>;
+  // Milestone 5: Queue and auto-compile APIs
+  compileQueueState: (payload: { projectId: string }) => Promise<{ pending: number; running: number; maxConcurrency: number }>;
+  compileTriggerAutoCompile: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
+  compileSetAutoCompileDelay: (payload: { delayMs: number }) => Promise<{ ok: boolean }>;
+  compileGetAutoCompileDelay: () => Promise<{ delayMs: number }>;
+  // Milestone 13: Clean build API
+  compileCleanBuildDir: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
 
   // Snapshot APIs
   snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;
@@ -37,6 +44,14 @@ export interface ElectronAPI {
   settingsGet: (payload: { key: string }) => Promise<any>;
   settingsSet: (payload: { key: string; value: any }) => Promise<{ ok: boolean }>;
   settingsCheckTeX: () => Promise<{ found: boolean; paths: any }>;
+  settingsGetTexSettings: () => Promise<any>;
+  settingsUpdateTexSettings: (payload: { settings: any }) => Promise<{ ok: boolean }>;
+  settingsRedetectTeX: () => Promise<any>;
+  settingsSetActiveDistribution: (payload: { distributionName: string }) => Promise<{ ok: boolean }>;
+  settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => Promise<{ ok: boolean }>;
+  // Auto-compile settings
+  settingsGetAutoCompileEnabled: () => Promise<{ enabled: boolean }>;
+  settingsSetAutoCompileEnabled: (payload: { enabled: boolean }) => Promise<{ ok: boolean }>;
 
   // Template APIs
   templateList: () => Promise<any[]>;

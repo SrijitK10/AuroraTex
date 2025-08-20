@@ -31,6 +31,8 @@ export interface ElectronAPI {
   compileTriggerAutoCompile: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
   compileSetAutoCompileDelay: (payload: { delayMs: number }) => Promise<{ ok: boolean }>;
   compileGetAutoCompileDelay: () => Promise<{ delayMs: number }>;
+  // Milestone 13: Clean build API
+  compileCleanBuildDir: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
 
   // Snapshot APIs
   snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;
@@ -46,6 +48,9 @@ export interface ElectronAPI {
   settingsRedetectTeX: () => Promise<any>;
   settingsSetActiveDistribution: (payload: { distributionName: string }) => Promise<{ ok: boolean }>;
   settingsAddCustomDistribution: (payload: { name: string; paths: Record<string, string> }) => Promise<{ ok: boolean }>;
+  // Auto-compile settings
+  settingsGetAutoCompileEnabled: () => Promise<{ enabled: boolean }>;
+  settingsSetAutoCompileEnabled: (payload: { enabled: boolean }) => Promise<{ ok: boolean }>;
 
   // Event listeners
   onCompileProgress: (callback: (event: any, data: any) => void) => void;

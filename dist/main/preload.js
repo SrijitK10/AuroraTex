@@ -47,6 +47,9 @@ const electronAPI = {
     settingsRedetectTeX: () => electron_1.ipcRenderer.invoke('Settings.RedetectTeX'),
     settingsSetActiveDistribution: (payload) => electron_1.ipcRenderer.invoke('Settings.SetActiveDistribution', payload),
     settingsAddCustomDistribution: (payload) => electron_1.ipcRenderer.invoke('Settings.AddCustomDistribution', payload),
+    // Auto-compile settings
+    settingsGetAutoCompileEnabled: () => electron_1.ipcRenderer.invoke('Settings.GetAutoCompileEnabled'),
+    settingsSetAutoCompileEnabled: (payload) => electron_1.ipcRenderer.invoke('Settings.SetAutoCompileEnabled', payload),
     // Template APIs
     templateList: () => electron_1.ipcRenderer.invoke('Template.List'),
     templateApply: (payload) => electron_1.ipcRenderer.invoke('Template.Apply', payload),

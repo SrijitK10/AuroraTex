@@ -31,8 +31,6 @@ interface TopbarProps {
   // Milestone 13: Performance & UX polish props
   onCleanBuild?: () => void;
   onQuickFileSearch?: () => void;
-  isAutoCompileEnabled?: boolean;
-  onToggleAutoCompile?: (enabled: boolean) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ 
@@ -53,9 +51,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenBibliography,
   onOpenSettings,
   onCleanBuild,
-  onQuickFileSearch,
-  isAutoCompileEnabled = false,
-  onToggleAutoCompile
+  onQuickFileSearch
 }) => {
   return (
     <div className="topbar-container">
@@ -177,24 +173,6 @@ export const Topbar: React.FC<TopbarProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <span className="hidden md:inline">Search</span>
-          </button>
-        )}
-        
-        {/* Milestone 13: Auto-compile toggle */}
-        {onToggleAutoCompile && (
-          <button
-            onClick={() => onToggleAutoCompile(!isAutoCompileEnabled)}
-            className={`px-3 py-2 rounded border flex items-center space-x-1 ${
-              isAutoCompileEnabled
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-            title={`Auto-compile: ${isAutoCompileEnabled ? 'ON' : 'OFF'} (Cmd/Ctrl+Shift+B)`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span className="hidden md:inline">Auto</span>
           </button>
         )}
         
