@@ -74,6 +74,21 @@ class CompileOrchestrator extends events_1.EventEmitter {
     getAutoCompileDelay() {
         return this.autoCompileDebounceMs;
     }
+    // Reset compilation state for a project (useful when enabling auto-compile after manual compiles)
+    resetProjectState(projectId) {
+        console.log(`[CompileOrchestrator] Resetting compilation state for project: ${projectId}`);
+        // Clear any pending auto-compile timers
+        const existingTimer = this.autoCompileTimers.get(projectId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            this.autoCompileTimers.delete(projectId);
+        }
+        // Reset pending auto-compile flag
+        this.pendingAutoCompile.set(projectId, false);
+        // Clear last compile time to allow immediate auto-compile
+        this.lastCompileEnd.delete(projectId);
+        console.log(`[CompileOrchestrator] Project state reset completed for: ${projectId}`);
+    }
     // Milestone 5: Debounced auto-compile triggered by file saves
     triggerAutoCompile(projectId) {
         console.log(`[CompileOrchestrator] Auto-compile triggered for project: ${projectId}`);

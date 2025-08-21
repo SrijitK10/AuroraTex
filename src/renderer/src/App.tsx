@@ -833,6 +833,7 @@ function App() {
   };
 
   const handleToggleAutoCompile = async (enabled: boolean) => {
+    console.log('🟢 AUTO-COMPILE TOGGLE:', enabled ? 'ENABLING' : 'DISABLING');
     setIsAutoCompileEnabled(enabled);
     console.log('Auto-compile mode:', enabled ? 'enabled' : 'disabled');
     
@@ -841,6 +842,17 @@ function App() {
       console.log('Resetting compilation state for auto-compile enablement');
       setIsCompiling(false);
       setCompilationStatus('idle');
+      
+      // Reset backend compilation state for this project
+      if (currentProject) {
+        try {
+          console.log('Resetting backend compilation state for project:', currentProject.id);
+          await window.electronAPI.compileResetProjectState({ projectId: currentProject.id });
+          console.log('Backend compilation state reset completed');
+        } catch (error) {
+          console.error('Failed to reset backend compilation state:', error);
+        }
+      }
     }
     
     // Save the setting persistently
@@ -854,9 +866,35 @@ function App() {
     // If enabling auto-compile, trigger an immediate compilation to test
     if (enabled && currentProject) {
       console.log('Auto-compile enabled - triggering immediate test compilation');
-      setTimeout(() => {
-        handleAutoCompile();
-      }, 100); // Small delay to ensure state is updated
+      
+      // Use a more robust approach that doesn't rely on state closure
+      setTimeout(async () => {
+        console.log('🧪 AUTO-COMPILE TEST: Starting test compilation...');
+        
+        if (!currentProject) {
+          console.log('🧪 AUTO-COMPILE TEST: No project, skipping');
+          return;
+        }
+        
+        console.log('🧪 AUTO-COMPILE TEST: Triggering auto-compile for project:', currentProject.id);
+        
+        try {
+          // Use the trigger API instead of the full compile to test auto-compile
+          const result = await window.electronAPI.compileTriggerAutoCompile({
+            projectId: currentProject.id
+          });
+          
+          console.log('🧪 AUTO-COMPILE TEST: Result:', result);
+          
+          if (result.ok) {
+            console.log('🧪 AUTO-COMPILE TEST: Successfully triggered auto-compile');
+          } else {
+            console.warn('🧪 AUTO-COMPILE TEST: Failed to trigger auto-compile:', result);
+          }
+        } catch (error) {
+          console.error('🧪 AUTO-COMPILE TEST: Error:', error);
+        }
+      }, 500); // Increased delay to ensure backend reset is complete
     }
   };
 

@@ -20,6 +20,7 @@ export declare class CompileOrchestrator extends EventEmitter {
     constructor();
     setAutoCompileDelay(delayMs: number): void;
     getAutoCompileDelay(): number;
+    resetProjectState(projectId: string): void;
     triggerAutoCompile(projectId: string): void;
     private handleAutoCompile;
     getQueueState(): {

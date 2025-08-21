@@ -209,6 +209,12 @@ class App {
       return { delayMs: this.compileOrchestrator.getAutoCompileDelay() };
     });
 
+    // Reset compilation state for a project
+    ipcMain.handle('Compile.ResetProjectState', async (_, payload) => {
+      this.compileOrchestrator.resetProjectState(payload.projectId);
+      return { ok: true };
+    });
+
     // Setup compile progress events (Milestone 4)
     this.compileOrchestrator.on('progress', (data) => {
       if (this.mainWindow) {

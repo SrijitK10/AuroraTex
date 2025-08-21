@@ -34,6 +34,7 @@ export interface ElectronAPI {
   compileTriggerAutoCompile: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
   compileSetAutoCompileDelay: (payload: { delayMs: number }) => Promise<{ ok: boolean }>;
   compileGetAutoCompileDelay: () => Promise<{ delayMs: number }>;
+  compileResetProjectState: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
   // Milestone 13: Clean build API
   compileCleanBuildDir: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
 
@@ -114,6 +115,7 @@ const electronAPI: ElectronAPI = {
   compileTriggerAutoCompile: (payload) => ipcRenderer.invoke('Compile.TriggerAutoCompile', payload),
   compileSetAutoCompileDelay: (payload) => ipcRenderer.invoke('Compile.SetAutoCompileDelay', payload),
   compileGetAutoCompileDelay: () => ipcRenderer.invoke('Compile.GetAutoCompileDelay'),
+  compileResetProjectState: (payload) => ipcRenderer.invoke('Compile.ResetProjectState', payload),
   // Milestone 13: Clean build API
   compileCleanBuildDir: (payload) => ipcRenderer.invoke('Compile.CleanBuildDir', payload),
 

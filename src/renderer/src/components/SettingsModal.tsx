@@ -297,9 +297,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   id="autoCompile"
                   onClick={() => {
+                    console.log('🔧 SETTINGS MODAL: Auto-compile toggle clicked');
                     const newValue = !localAutoCompileEnabled;
+                    console.log('🔧 SETTINGS MODAL: Toggling from', localAutoCompileEnabled, 'to', newValue);
                     setLocalAutoCompileEnabled(newValue);
                     // Immediately call the parent function to update the app state
+                    console.log('🔧 SETTINGS MODAL: Calling parent onToggleAutoCompile with:', newValue);
                     onToggleAutoCompile(newValue);
                   }}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
