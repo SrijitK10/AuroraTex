@@ -14,6 +14,7 @@ import { Topbar } from './components/Topbar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
 import SettingsModal from './components/SettingsModal';
+import { ImageOverlay } from './components/ImageOverlay';
 
 export interface Project {
   id: string;
@@ -112,12 +113,35 @@ function App() {
   const [useVirtualizedFileTree, setUseVirtualizedFileTree] = useState(false);
   const [isIncrementalBuildEnabled, setIsIncrementalBuildEnabled] = useState(true);
 
+  // Image overlay state (isolated - doesn't interfere with existing functionality)
+  const [showImageOverlay, setShowImageOverlay] = useState(false);
+  const [imageOverlayFile, setImageOverlayFile] = useState<{
+    projectId: string;
+    filePath: string;
+    fileName: string;
+  } | null>(null);
+
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
+
+  // Helper function to check if file is an image
+  const isImageFile = (fileName: string): boolean => {
+    if (!fileName) return false;
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp', '.ico', '.tiff', '.tif'];
+    return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+  };
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Close image overlay on Escape
+      if (event.key === 'Escape' && showImageOverlay) {
+        event.preventDefault();
+        setShowImageOverlay(false);
+        setImageOverlayFile(null);
+        return;
+      }
+      
       // Milestone 13: Build shortcut - Cmd+B (Mac) or Ctrl+B (Windows/Linux)
       if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
         event.preventDefault();
@@ -421,6 +445,19 @@ function App() {
   const openFile = async (filePath: string) => {
     if (!currentProject) return;
 
+    const fileName = filePath.split('/').pop() || filePath;
+
+    // Check if it's an image file - open in overlay instead of tab
+    if (isImageFile(fileName)) {
+      setImageOverlayFile({
+        projectId: currentProject.id,
+        filePath: filePath,
+        fileName: fileName,
+      });
+      setShowImageOverlay(true);
+      return;
+    }
+
     // Check if file is already open
     const existingTab = openTabs.find(tab => tab.path === filePath);
     if (existingTab) {
@@ -437,7 +474,7 @@ function App() {
       const tab: Tab = {
         id: Date.now().toString(),
         path: filePath,
-        name: filePath.split('/').pop() || filePath,
+        name: fileName,
         content: typeof content === 'string' ? content : '',
         isDirty: false,
       };
@@ -643,7 +680,7 @@ function App() {
     }
   };
 
-  const compileProject = async (forceClean = false) => {
+  const compileProject = async () => {
     if (!currentProject || isCompiling) return;
 
     setIsCompiling(true);
@@ -658,7 +695,6 @@ function App() {
     try {
       const result = await window.electronAPI.compileRun({
         projectId: currentProject.id,
-        forceClean, // Milestone 13: Support clean builds
       });
 
       // Milestone 4: Listen for live progress events
@@ -750,7 +786,7 @@ function App() {
         console.log('Build directory cleaned for clean build');
         
         // Start clean compilation
-        await compileProject(true);
+        await compileProject();
       } catch (error) {
         console.error('Failed to clean build directory:', error);
         alert('Failed to clean build directory: ' + (error as Error).message);
@@ -1049,7 +1085,7 @@ function App() {
       <Topbar 
         project={currentProject}
         isCompiling={isCompiling}
-        onCompile={() => compileProject(false)}
+        onCompile={() => compileProject()}
         onCleanBuild={handleCleanBuild}
         onToggleLog={() => setShowLogPanel(!showLogPanel)}
         showSidebar={showSidebar}
@@ -1205,6 +1241,20 @@ function App() {
           fileName={selectedBibFile}
           isOpen={showBibManager}
           onClose={handleCloseBibManager}
+        />
+      )}
+
+      {/* Image Overlay - Isolated component that doesn't interfere with existing functionality */}
+      {imageOverlayFile && (
+        <ImageOverlay
+          projectId={imageOverlayFile.projectId}
+          filePath={imageOverlayFile.filePath}
+          fileName={imageOverlayFile.fileName}
+          isVisible={showImageOverlay}
+          onClose={() => {
+            setShowImageOverlay(false);
+            setImageOverlayFile(null);
+          }}
         />
       )}
     </div>
