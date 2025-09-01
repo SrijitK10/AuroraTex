@@ -386,63 +386,67 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       {/* PDF Content */}
       <div 
         ref={containerRef} 
-        className="flex-1 bg-gray-100 overflow-hidden relative"
+        className="flex-1 bg-gray-100 overflow-auto relative p-4"
         tabIndex={0}
         onClick={handleContainerClick}
-        style={{ outline: 'none' }}
+        style={{ 
+          outline: 'none',
+          scrollbarWidth: 'auto',
+          scrollbarColor: '#cbd5e1 #f1f5f9'
+        }}
       >
-        <div 
-          className="h-full w-full overflow-auto p-4" 
-          style={{
-            scrollbarWidth: 'auto',
-            scrollbarColor: '#cbd5e1 #f1f5f9'
-          }}
-        >
-          {loading && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p className="text-gray-600">Loading PDF...</p>
-              </div>
+        {loading && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+              <p className="text-gray-600">Loading PDF...</p>
             </div>
-          )}
+          </div>
+        )}
 
-          {error && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center max-w-md">
-                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-gray-600 mb-2">{error}</p>
-                <button
-                  onClick={() => loadPDF(false)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Try Again
-                </button>
-              </div>
+        {error && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center max-w-md">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-gray-600 mb-2">{error}</p>
+              <button
+                onClick={() => loadPDF(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Try Again
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {pdfDoc && !loading && !error && (
-            <div className="flex justify-center min-h-full">
-              <div style={{ transform: `scale(${scale / 1.2})`, transformOrigin: 'center top' }}>
-                <canvas
-                  ref={canvasRef}
-                  className="shadow-lg border border-gray-300 bg-white"
-                  style={{ 
-                    display: 'block',
-                    imageRendering: 'crisp-edges' as any
-                  }}
-                />
-              </div>
+        {pdfDoc && !loading && !error && (
+          <div 
+            className="flex justify-center"
+            style={{ 
+              minWidth: 'fit-content', 
+              minHeight: 'fit-content',
+              width: 'max-content',
+              margin: '0 auto'
+            }}
+          >
+            <div style={{ transform: `scale(${scale / 1.2})`, transformOrigin: 'center top' }}>
+              <canvas
+                ref={canvasRef}
+                className="shadow-lg border border-gray-300 bg-white"
+                style={{ 
+                  display: 'block',
+                  imageRendering: 'crisp-edges' as any
+                }}
+              />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Zoom Controls - Bottom Left */}
         {pdfDoc && !loading && !error && (
-          <div className="absolute bottom-4 left-4 flex items-center space-x-1 bg-white border border-gray-300 rounded-lg shadow-md px-2 py-1">
+          <div className="absolute bottom-4 left-4 flex items-center space-x-1 bg-white border border-gray-300 rounded-lg shadow-md px-2 py-1 z-10">
             <button
               onClick={zoomOut}
               className="p-1 rounded hover:bg-gray-100 text-gray-600"
