@@ -788,6 +788,30 @@ export class CompileOrchestrator extends EventEmitter {
       }
     }
 
+    // Ensure TeX paths are in PATH - critical for finding pdflatex, xelatex, etc.
+    const texPaths = [
+      '/Library/TeX/texbin',
+      '/usr/local/texlive/2025/bin/universal-darwin',
+      '/usr/local/texlive/2024/bin/universal-darwin',
+      '/usr/local/texlive/2023/bin/universal-darwin',
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin'
+    ];
+
+    // Add TeX paths to existing PATH if they exist
+    let currentPath = sanitizedEnv.PATH || '';
+    const pathSeparator = platform() === 'win32' ? ';' : ':';
+    
+    for (const texPath of texPaths) {
+      if (existsSync(texPath) && !currentPath.includes(texPath)) {
+        currentPath = texPath + pathSeparator + currentPath;
+      }
+    }
+    
+    sanitizedEnv.PATH = currentPath;
+
     // Milestone 4 & 10: Set TeX-specific environment variables pointing to build dir
     sanitizedEnv.TEXMFVAR = buildDir;
     sanitizedEnv.TEXINPUTS = `${buildDir}:`;
@@ -805,7 +829,7 @@ export class CompileOrchestrator extends EventEmitter {
       delete sanitizedEnv[key];
     }
 
-    console.log('[CompileOrchestrator] Created sanitized environment for LaTeX compilation');
+    console.log(`[CompileOrchestrator] Created sanitized environment with PATH: ${sanitizedEnv.PATH}`);
     return sanitizedEnv;
   }
 

@@ -266,13 +266,28 @@ export class SettingsService {
 
   async getTexBinaryPath(binary: string): Promise<string | null> {
     const settings = await this.getTexSettings();
-    const activeDistribution = settings.distributions.find(d => d.isActive);
+    let activeDistribution = settings.distributions.find(d => d.isActive);
+    
+    // If no active distribution is set, try to find the first valid one
+    if (!activeDistribution) {
+      activeDistribution = settings.distributions.find(d => d.isValid);
+      if (activeDistribution) {
+        console.log(`[SettingsService] No active distribution set, using first valid: ${activeDistribution.name}`);
+        // Automatically set as active
+        await this.setActiveDistribution(activeDistribution.name);
+      }
+    }
     
     if (activeDistribution) {
       const binaryInfo = activeDistribution[binary as keyof TeXDistribution] as any;
       if (binaryInfo && binaryInfo.path && binaryInfo.isValid) {
+        console.log(`[SettingsService] Found ${binary} at: ${binaryInfo.path}`);
         return binaryInfo.path;
+      } else {
+        console.log(`[SettingsService] Binary ${binary} not found or invalid in active distribution`);
       }
+    } else {
+      console.log(`[SettingsService] No valid TeX distribution found for binary: ${binary}`);
     }
     
     return null;
