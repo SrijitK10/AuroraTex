@@ -10,6 +10,7 @@ import { SnapshotService } from './services/SnapshotService';
 import { TemplateService } from './services/TemplateService';
 import { SnippetService } from './services/SnippetService';
 import { BibTeXService } from './services/BibTeXService';
+import { FirstRunService } from './services/FirstRunService';
 
 class App {
   private mainWindow: BrowserWindow | null = null;
@@ -22,10 +23,12 @@ class App {
   private templateService: TemplateService;
   private snippetService: SnippetService;
   private bibTexService: BibTeXService;
+  private firstRunService: FirstRunService;
 
   constructor() {
     this.projectService = new ProjectService();
     this.settingsService = new SettingsService();
+    this.firstRunService = new FirstRunService(this.settingsService);
     this.compileOrchestrator = new CompileOrchestrator();
     this.autoCompileService = new AutoCompileService(this.compileOrchestrator, this.settingsService);
     this.fileService = new FileService(this.autoCompileService);
@@ -43,6 +46,23 @@ class App {
     await this.settingsService.initialize();
     await this.templateService.initialize();
     await this.snippetService.initialize();
+    
+    // Perform first-run check and setup
+    console.log('[App] Performing first-run check...');
+    const firstRunResult = await this.firstRunService.performFirstRunCheck();
+    
+    if (firstRunResult.isFirstRun) {
+      console.log('[App] First run detected - setting up defaults...');
+      await this.firstRunService.writeDefaultSettings();
+      
+      // Log first-run results for debugging
+      console.log('[App] First-run check results:', {
+        checks: firstRunResult.checks,
+        texDistributions: firstRunResult.texDistributions.length,
+        errors: firstRunResult.errors.length,
+        recommendations: firstRunResult.recommendations.length
+      });
+    }
     
     this.createWindow();
     this.setupIPC();
@@ -404,6 +424,20 @@ class App {
     
     ipcMain.handle('FS.StopWatching', async (_, payload) => {
       await this.fileService.stopWatching(payload.projectId);
+      return { ok: true };
+    });
+
+    // First-run and installation check handlers
+    ipcMain.handle('FirstRun.PerformCheck', async () => {
+      return await this.firstRunService.performFirstRunCheck();
+    });
+
+    ipcMain.handle('FirstRun.IsFirstRun', async () => {
+      return { isFirstRun: this.firstRunService.isFirstRun() };
+    });
+
+    ipcMain.handle('FirstRun.WriteDefaultSettings', async () => {
+      await this.firstRunService.writeDefaultSettings();
       return { ok: true };
     });
   }

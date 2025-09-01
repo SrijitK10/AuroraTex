@@ -69,6 +69,11 @@ export interface ElectronAPI {
   bibTexCreateEntry: (payload: { type: string }) => Promise<any>;
   bibTexGetEntryTypes: () => Promise<any[]>;
 
+  // First Run APIs
+  firstRunPerformCheck: () => Promise<any>;
+  firstRunIsFirstRun: () => Promise<{ isFirstRun: boolean }>;
+  firstRunWriteDefaultSettings: () => Promise<{ ok: boolean }>;
+
   // Event listeners
   onCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;

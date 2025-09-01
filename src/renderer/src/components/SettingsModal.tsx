@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FirstRunStatus from './FirstRunStatus';
 
 interface TeXBinary {
   path: string | null;
@@ -58,7 +59,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [texSettings, setTexSettings] = useState<TeXSettings | null>(null);
   const [isLoadingTeX, setIsLoadingTeX] = useState(false);
   const [isRedetecting, setIsRedetecting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'compilation' | 'tex' | 'security'>('compilation');
+  const [activeTab, setActiveTab] = useState<'compilation' | 'tex' | 'security' | 'system'>('compilation');
   const [customDistributionName, setCustomDistributionName] = useState('');
   const [customPaths, setCustomPaths] = useState<Record<string, string>>({});
   const [showAddCustom, setShowAddCustom] = useState(false);
@@ -276,6 +277,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               Security & Limits
+            </button>
+            {/* Milestone 14: System Status Tab */}
+            <button
+              onClick={() => setActiveTab('system')}
+              className={`px-3 py-1 text-sm rounded transition-colors ${
+                activeTab === 'system' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              System Status
             </button>
           </div>
         </div>
@@ -775,6 +785,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Milestone 14: System Status Tab */}
+          {activeTab === 'system' && (
+            <div className="space-y-6">
+              <FirstRunStatus />
             </div>
           )}
         </div>

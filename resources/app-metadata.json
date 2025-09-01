@@ -1,0 +1,14 @@
+{
+  "buildDate": "2025-09-01T15:36:55.116Z",
+  "version": "1.0.0",
+  "bundledTeX": true,
+  "features": {
+    "offlineReady": true,
+    "bundledTemplates": true,
+    "autoCompile": true,
+    "pdfViewer": true,
+    "syntaxHighlighting": true,
+    "bibTeXSupport": true,
+    "snapshotHistory": true
+  }
+}

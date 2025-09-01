@@ -72,6 +72,11 @@ export interface ElectronAPI {
   bibTexCreateEntry: (payload: { type: string }) => Promise<any>;
   bibTexGetEntryTypes: () => Promise<any[]>;
 
+  // First Run APIs
+  firstRunPerformCheck: () => Promise<any>;
+  firstRunIsFirstRun: () => Promise<{ isFirstRun: boolean }>;
+  firstRunWriteDefaultSettings: () => Promise<{ ok: boolean }>;
+
   // Event listeners
   onCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
@@ -155,6 +160,11 @@ const electronAPI: ElectronAPI = {
   bibTexWrite: (payload) => ipcRenderer.invoke('BibTeX.Write', payload),
   bibTexCreateEntry: (payload) => ipcRenderer.invoke('BibTeX.CreateEntry', payload),
   bibTexGetEntryTypes: () => ipcRenderer.invoke('BibTeX.GetEntryTypes'),
+
+  // First Run APIs
+  firstRunPerformCheck: () => ipcRenderer.invoke('FirstRun.PerformCheck'),
+  firstRunIsFirstRun: () => ipcRenderer.invoke('FirstRun.IsFirstRun'),
+  firstRunWriteDefaultSettings: () => ipcRenderer.invoke('FirstRun.WriteDefaultSettings'),
 
   // Event listeners
   onCompileProgress: (callback) => ipcRenderer.on('Compile.Progress', callback),

@@ -1,0 +1,13 @@
+{
+  "id": "simple-article",
+  "name": "Simple Article",
+  "description": "A clean, minimal article template perfect for academic papers and reports",
+  "category": "Academic",
+  "tags": ["article", "academic", "simple"],
+  "mainFile": "main.tex",
+  "thumbnail": "thumbnail.png",
+  "files": {
+    "main.tex": "\\documentclass[11pt,a4paper]{article}\n\\usepackage[utf8]{inputenc}\n\\usepackage[T1]{fontenc}\n\\usepackage{amsmath,amsfonts,amssymb}\n\\usepackage[margin=1in]{geometry}\n\\usepackage{graphicx}\n\\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}\n\n\\title{Your Article Title}\n\\author{Your Name \\\\\\\\ Your Institution}\n\\date{\\today}\n\n\\begin{document}\n\n\\maketitle\n\n\\begin{abstract}\nThis is the abstract of your article. It provides a brief summary of the main content and findings.\n\\end{abstract}\n\n\\section{Introduction}\n\nThis is the introduction section. You can write your introduction here.\n\n\\section{Methods}\n\nDescribe your methodology here.\n\n\\section{Results}\n\nPresent your results here. You can include figures and tables:\n\n\\begin{figure}[h]\n  \\centering\n  % \\includegraphics[width=0.8\\textwidth]{your-figure.png}\n  \\caption{Your figure caption}\n  \\label{fig:example}\n\\end{figure}\n\n\\section{Discussion}\n\nDiscuss your findings here.\n\n\\section{Conclusion}\n\nSummarize your work and conclusions.\n\n\\bibliographystyle{plain}\n% \\bibliography{references}\n\n\\end{document}",
+    "references.bib": "@article{example2023,\n  title={An Example Article},\n  author={Smith, John and Doe, Jane},\n  journal={Journal of Examples},\n  volume={42},\n  number={1},\n  pages={1--10},\n  year={2023},\n  publisher={Example Publisher}\n}\n\n@book{examplebook2022,\n  title={Example Book},\n  author={Johnson, Alice},\n  year={2022},\n  publisher={Academic Press}\n}"
+  }
+}
