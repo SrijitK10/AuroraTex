@@ -27,7 +27,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(1.0);
+  const [scale, setScale] = useState(1.2); // Start with a slightly higher scale for better readability
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -149,29 +149,48 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
 
     try {
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
+      
+      // Get device pixel ratio for high-DPI displays (retina, etc.)
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      
+      // Calculate effective scale accounting for device pixel ratio
+      const effectiveScale = scale * devicePixelRatio;
+      
+      // Get viewport with the effective scale
+      const viewport = page.getViewport({ scale: effectiveScale });
       
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       
       if (!context) return;
       
-      // Set the canvas size to match the viewport
+      // Set canvas internal size to the high-resolution size
       canvas.height = viewport.height;
       canvas.width = viewport.width;
       
+      // Set canvas display size to the normal size (scaled down for retina)
+      canvas.style.height = `${viewport.height / devicePixelRatio}px`;
+      canvas.style.width = `${viewport.width / devicePixelRatio}px`;
+      
+      // Scale the drawing context to account for device pixel ratio
+      context.scale(devicePixelRatio, devicePixelRatio);
+      
       // Clear the canvas before rendering
-      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.clearRect(0, 0, canvas.width / devicePixelRatio, canvas.height / devicePixelRatio);
+      
+      // Enable image smoothing for better quality
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
       
       const renderContext = {
         canvasContext: context,
-        viewport: viewport,
+        viewport: page.getViewport({ scale }), // Use original scale for rendering context
       };
       
       const renderTask = page.render(renderContext);
       await renderTask.promise;
       
-      console.log(`Rendered page ${pageNum} at scale ${scale} (${viewport.width}x${viewport.height})`);
+      console.log(`Rendered page ${pageNum} at scale ${scale} with DPR ${devicePixelRatio} (${viewport.width}x${viewport.height})`);
     } catch (err) {
       console.error('Error rendering page:', err);
       setError('Failed to render PDF page');
@@ -181,6 +200,19 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   useEffect(() => {
     loadPDF();
   }, [projectId]);
+
+  // Handle window resize to re-render at correct DPI
+  useEffect(() => {
+    const handleResize = () => {
+      // Re-render current page when window is resized (DPI might change)
+      if (pdfDoc && currentPage) {
+        setTimeout(() => renderPage(currentPage), 100);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [pdfDoc, currentPage]);
 
   // Respond to external refresh triggers (from compile success)
   useEffect(() => {
@@ -220,20 +252,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   };
 
   const zoomIn = () => {
-    const newScale = Math.min(scale + 0.25, 3.0);
+    const newScale = Math.min(scale + 0.2, 4.0); // Increased max zoom and increment
     console.log(`Zoom in: ${scale} -> ${newScale}`);
     setScale(newScale);
   };
 
   const zoomOut = () => {
-    const newScale = Math.max(scale - 0.25, 0.25);
+    const newScale = Math.max(scale - 0.2, 0.4); // Better increment and minimum
     console.log(`Zoom out: ${scale} -> ${newScale}`);
     setScale(newScale);
   };
 
   const resetZoom = () => {
-    console.log(`Reset zoom: ${scale} -> 1.0`);
-    setScale(1.0);
+    console.log(`Reset zoom: ${scale} -> 1.2`);
+    setScale(1.2); // Reset to the new default scale
   };
 
   return (
@@ -343,9 +375,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
               <button
                 onClick={resetZoom}
                 className="p-1 rounded hover:bg-gray-100 text-gray-600 text-xs"
-                title="Reset Zoom"
+                title="Reset Zoom (120%)"
               >
-                1:1
+                Reset
               </button>
             </div>
           </div>
@@ -393,7 +425,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
                 ref={canvasRef}
                 className="shadow-lg border border-gray-300 bg-white block"
                 style={{ 
-                  display: 'block'
+                  display: 'block',
+                  imageRendering: 'crisp-edges' as any
                 }}
               />
             </div>
