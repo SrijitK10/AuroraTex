@@ -16,6 +16,7 @@ export class AutoCompileService extends EventEmitter {
   private compileOrchestrator: CompileOrchestrator;
   private settingsService: SettingsService;
   private activeJobs: Map<string, AutoCompileJob> = new Map();
+  private activeCompileJobs: Map<string, string> = new Map(); // projectId -> jobId mapping for auto-compiles
   private isEnabled: boolean = false;
   private delay: number = 1000; // 1 second default delay
   
@@ -23,7 +24,39 @@ export class AutoCompileService extends EventEmitter {
     super();
     this.compileOrchestrator = compileOrchestrator;
     this.settingsService = settingsService;
+    this.setupCompileListeners();
     this.loadSettings();
+  }
+
+  private setupCompileListeners(): void {
+    // Listen for compilation progress events to detect auto-compile completion
+    this.compileOrchestrator.on('progress', (data) => {
+      // Check if this is an auto-compile job by matching jobId
+      for (const [projectId, jobId] of this.activeCompileJobs.entries()) {
+        if (data.jobId === jobId) {
+          console.log(`[AutoCompileService] Received progress for auto-compile jobId ${jobId}:`, JSON.stringify(data));
+          
+          // Only emit progress events that have meaningful state
+          if (data.state) {
+            // Forward the progress event as an auto-compile event
+            this.emit('autoCompileProgress', { 
+              projectId, 
+              jobId: data.jobId, 
+              state: data.state, 
+              message: data.message,
+              percent: data.percent 
+            });
+
+            // If compilation finished, clean up the tracking
+            if (data.state === 'success' || data.state === 'error' || data.state === 'killed') {
+              console.log(`[AutoCompileService] Auto-compile ${data.state} for project: ${projectId}, jobId: ${jobId}`);
+              this.activeCompileJobs.delete(projectId);
+            }
+          }
+          break;
+        }
+      }
+    });
   }
 
   private async loadSettings(): Promise<void> {
@@ -109,6 +142,9 @@ export class AutoCompileService extends EventEmitter {
       const result = await this.compileOrchestrator.run(projectId, undefined, undefined, true); // isAutoCompile = true
       console.log(`[AutoCompileService] Auto-compile started successfully for project: ${projectId}, jobId: ${result.jobId}`);
       
+      // Track this job so we can detect its completion
+      this.activeCompileJobs.set(projectId, result.jobId);
+      
       // Emit event for UI updates
       this.emit('autoCompileStarted', { projectId, jobId: result.jobId });
     } catch (error) {
@@ -151,6 +187,7 @@ export class AutoCompileService extends EventEmitter {
   destroy(): void {
     console.log('[AutoCompileService] Destroying service');
     this.cancelAllJobs();
+    this.activeCompileJobs.clear();
     this.removeAllListeners();
   }
 }

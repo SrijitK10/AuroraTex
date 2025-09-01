@@ -283,6 +283,29 @@ function App() {
     };
   }, []);
 
+  // Set up auto-compile progress listener for PDF refresh
+  useEffect(() => {
+    const handleAutoCompileProgress = (event: any, data: any) => {
+      console.log('[App] Auto-compile progress:', data);
+      
+      // Check if this is for the current project
+      if (data.projectId === currentProject?.id) {
+        if (data.state === 'success') {
+          console.log('[App] Auto-compile successful - refreshing PDF');
+          setPdfRefreshTrigger(prev => prev + 1);
+        } else if (data.state === 'error') {
+          console.log('[App] Auto-compile failed:', data.message);
+        }
+      }
+    };
+
+    window.electronAPI.onAutoCompileProgress(handleAutoCompileProgress);
+    
+    return () => {
+      window.electronAPI.removeAutoCompileProgressListener(handleAutoCompileProgress);
+    };
+  }, [currentProject?.id]);
+
   // Set up app close handler for auto-snapshot
   useEffect(() => {
     const handleAppClose = async () => {

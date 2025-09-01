@@ -71,6 +71,9 @@ const electronAPI = {
     // Milestone 5: Queue state change event listeners
     onQueueStateChange: (callback) => electron_1.ipcRenderer.on('Compile.QueueStateChange', callback),
     removeQueueStateChangeListener: (callback) => electron_1.ipcRenderer.removeListener('Compile.QueueStateChange', callback),
+    // Auto-compile event listeners
+    onAutoCompileProgress: (callback) => electron_1.ipcRenderer.on('AutoCompile.Progress', callback),
+    removeAutoCompileProgressListener: (callback) => electron_1.ipcRenderer.removeListener('AutoCompile.Progress', callback),
 };
 electron_1.contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 //# sourceMappingURL=preload.js.map

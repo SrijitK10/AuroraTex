@@ -10,9 +10,11 @@ export declare class AutoCompileService extends EventEmitter {
     private compileOrchestrator;
     private settingsService;
     private activeJobs;
+    private activeCompileJobs;
     private isEnabled;
     private delay;
     constructor(compileOrchestrator: CompileOrchestrator, settingsService: SettingsService);
+    private setupCompileListeners;
     private loadSettings;
     setEnabled(enabled: boolean): Promise<void>;
     setDelay(delayMs: number): Promise<void>;

@@ -215,6 +215,8 @@ export interface ElectronAPI {
     removeFileChangedListener: (callback: (event: any, data: any) => void) => void;
     onQueueStateChange: (callback: (event: any, data: any) => void) => void;
     removeQueueStateChangeListener: (callback: (event: any, data: any) => void) => void;
+    onAutoCompileProgress: (callback: (event: any, data: any) => void) => void;
+    removeAutoCompileProgressListener: (callback: (event: any, data: any) => void) => void;
 }
 declare global {
     interface Window {

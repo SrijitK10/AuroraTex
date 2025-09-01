@@ -61,6 +61,9 @@ export interface ElectronAPI {
   // Milestone 5: Queue state change event listeners
   onQueueStateChange: (callback: (event: any, data: any) => void) => void;
   removeQueueStateChangeListener: (callback: (event: any, data: any) => void) => void;
+  // Auto-compile event listeners
+  onAutoCompileProgress: (callback: (event: any, data: any) => void) => void;
+  removeAutoCompileProgressListener: (callback: (event: any, data: any) => void) => void;
 }
 
 declare global {

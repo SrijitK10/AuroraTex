@@ -184,6 +184,25 @@ class App {
                 this.mainWindow.webContents.send('Compile.QueueStateChange', data);
             }
         });
+        // Setup auto-compile progress events for PDF refresh
+        this.autoCompileService.on('autoCompileProgress', (data) => {
+            if (this.mainWindow) {
+                console.log(`[Main] Auto-compile progress: ${data.state} for project: ${data.projectId}`);
+                this.mainWindow.webContents.send('AutoCompile.Progress', data);
+            }
+        });
+        this.autoCompileService.on('autoCompileStarted', (data) => {
+            if (this.mainWindow) {
+                console.log(`[Main] Auto-compile started for project: ${data.projectId}, jobId: ${data.jobId}`);
+                this.mainWindow.webContents.send('AutoCompile.Started', data);
+            }
+        });
+        this.autoCompileService.on('autoCompileError', (data) => {
+            if (this.mainWindow) {
+                console.log(`[Main] Auto-compile error for project: ${data.projectId}`, data.error);
+                this.mainWindow.webContents.send('AutoCompile.Error', data);
+            }
+        });
         // Snapshot IPC handlers
         electron_1.ipcMain.handle('Snapshot.Create', async (_, payload) => {
             return await this.snapshotService.create(payload.projectId, payload.message);

@@ -80,6 +80,9 @@ export interface ElectronAPI {
   // Milestone 5: Queue state change event listeners
   onQueueStateChange: (callback: (event: any, data: any) => void) => void;
   removeQueueStateChangeListener: (callback: (event: any, data: any) => void) => void;
+  // Auto-compile event listeners
+  onAutoCompileProgress: (callback: (event: any, data: any) => void) => void;
+  removeAutoCompileProgressListener: (callback: (event: any, data: any) => void) => void;
 }
 
 // Expose the API to the renderer process
@@ -161,6 +164,9 @@ const electronAPI: ElectronAPI = {
   // Milestone 5: Queue state change event listeners
   onQueueStateChange: (callback) => ipcRenderer.on('Compile.QueueStateChange', callback),
   removeQueueStateChangeListener: (callback) => ipcRenderer.removeListener('Compile.QueueStateChange', callback),
+  // Auto-compile event listeners
+  onAutoCompileProgress: (callback) => ipcRenderer.on('AutoCompile.Progress', callback),
+  removeAutoCompileProgressListener: (callback) => ipcRenderer.removeListener('AutoCompile.Progress', callback),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
