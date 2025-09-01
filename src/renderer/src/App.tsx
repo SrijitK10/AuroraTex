@@ -189,7 +189,8 @@ function App() {
           !showErrorsPanel && 
           !showHistoryPanel &&
           !showSnippetsPalette &&
-          !showQuickFileSearch) {
+          !showQuickFileSearch &&
+          !showImageOverlay) {
         event.preventDefault();
         handleEscapeBackToProjects();
       }
@@ -197,7 +198,7 @@ function App() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, isAutoCompileEnabled, showLogPanel, showErrorsPanel, showHistoryPanel, showSnippetsPalette, showQuickFileSearch]);
+  }, [currentProject, isAutoCompileEnabled, showLogPanel, showErrorsPanel, showHistoryPanel, showSnippetsPalette, showQuickFileSearch, showImageOverlay]);
 
   // Load file tree when project changes
   useEffect(() => {
@@ -255,15 +256,8 @@ function App() {
             reloadFile(affectedTab.id, data.path);
           }
 
-          // Milestone 5: Trigger auto-compile on file changes (only if not external and is .tex file)
-          if (isAutoCompileEnabled && data.path.endsWith('.tex')) {
-            console.log('Auto-compile check - path:', data.path, 'isExternal:', data.isExternal, 'enabled:', isAutoCompileEnabled);
-            
-            // Trigger auto-compile for any .tex file changes when enabled
-            // For now, trigger on any .tex file change since we want to test the functionality
-            console.log('Auto-compile triggered by file change:', data.path);
-            handleAutoCompile();
-          }
+          // Note: Auto-compile is handled by the save mechanism, not file watching
+          // to avoid duplicate triggers and conflicts with the compilation state
         }
         
         // Handle file deletions
@@ -502,10 +496,17 @@ function App() {
   };
 
   const saveFile = async (tabId: string, content: string, isAutosave = false) => {
+    console.log(`🔥 saveFile called: tabId=${tabId}, isAutosave=${isAutosave}, autoCompileEnabled=${isAutoCompileEnabled}`);
+    
     if (!currentProject) return;
 
     const tab = openTabs.find(tab => tab.id === tabId);
-    if (!tab) return;
+    if (!tab) {
+      console.log(`🔥 saveFile: tab not found for id ${tabId}`);
+      return;
+    }
+
+    console.log(`🔥 saveFile: found tab for ${tab.path}`);
 
     try {
       await window.electronAPI.fsWriteFile({
@@ -522,6 +523,8 @@ function App() {
       console.log(`File saved: ${tab.path} (autosave: ${isAutosave})`);
       
       // Auto-compile integration: trigger auto-compile if enabled and file is a .tex file
+      console.log(`Auto-compile check: enabled=${isAutoCompileEnabled}, file=${tab.path}, isTexFile=${tab.path.toLowerCase().endsWith('.tex')}`);
+      
       if (isAutoCompileEnabled && tab.path.toLowerCase().endsWith('.tex')) {
         console.log(`Auto-compile trigger: saving ${tab.path} with auto-compile enabled`);
         try {
@@ -533,6 +536,8 @@ function App() {
           console.error('Failed to trigger auto-compile:', error);
           // Don't show an alert for auto-compile failures to avoid disrupting user workflow
         }
+      } else {
+        console.log('Auto-compile skipped - either disabled or not a .tex file');
       }
     } catch (error) {
       console.error('Failed to save file:', error);
@@ -804,133 +809,21 @@ function App() {
     }
   }, [fileTree]);
 
-  // Milestone 5: Auto-compile and toggle functions
-  const handleAutoCompile = async () => {
-    if (!currentProject || !isAutoCompileEnabled || isCompiling) {
-      console.log('Auto-compile skipped:', { 
-        hasProject: !!currentProject, 
-        enabled: isAutoCompileEnabled, 
-        isCompiling 
-      });
-      return;
-    }
-
-    console.log('Auto-compile triggered for project:', currentProject.id);
-    
-    try {
-      // Use the regular compile function but mark it as auto-compile
-      setIsCompiling(true);
-      setCompilationStatus('compiling');
-      // Note: Don't automatically open log panel for auto-compiles to be less disruptive
-      
-      const result = await window.electronAPI.compileRun({
-        projectId: currentProject.id,
-        isAutoCompile: true as any, // Auto-compile flag
-      } as any);
-
-      console.log('Auto-compile job started:', result.jobId);
-
-      // Listen for progress (same as manual compile)
-      const handleProgress = (event: any, data: any) => {
-        if (data.jobId === result.jobId) {
-          if (data.line) {
-            setLogs(prev => [...prev, data.line]);
-          }
-          
-          if (data.state === 'success') {
-            setIsCompiling(false);
-            setCompilationStatus('success');
-            console.log('✅ Auto-compilation successful - refreshing PDF in 500ms');
-            setTimeout(() => {
-              setPdfRefreshTrigger(prev => prev + 1);
-              console.log('PDF refresh triggered after 500ms delay (auto-compile)');
-            }, 500);
-            // Milestone 6: Fetch and process errors for auto-compile too
-            fetchAndProcessErrors(data.jobId || result.jobId);
-            window.electronAPI.removeCompileProgressListener(handleProgress);
-          } else if (data.state === 'error' || data.state === 'killed') {
-            setIsCompiling(false);
-            setCompilationStatus('error');
-            console.log('❌ Auto-compilation failed');
-            // Milestone 6: Fetch and process errors for auto-compile
-            fetchAndProcessErrors(data.jobId || result.jobId);
-            window.electronAPI.removeCompileProgressListener(handleProgress);
-          }
-        }
-      };
-
-      window.electronAPI.onCompileProgress(handleProgress);
-      
-    } catch (error) {
-      console.error('Failed to trigger auto-compile:', error);
-      setIsCompiling(false);
-      setCompilationStatus('error');
-    }
-  };
+  // Auto-compile is now handled by the AutoCompileService in the backend
+  // File saves trigger auto-compile through window.electronAPI.compileTriggerAutoCompile()
 
   const handleToggleAutoCompile = async (enabled: boolean) => {
     console.log('🟢 AUTO-COMPILE TOGGLE:', enabled ? 'ENABLING' : 'DISABLING');
     setIsAutoCompileEnabled(enabled);
-    console.log('Auto-compile mode:', enabled ? 'enabled' : 'disabled');
     
-    // Reset compilation state when toggling auto-compile to prevent stuck states
-    if (enabled) {
-      console.log('Resetting compilation state for auto-compile enablement');
-      setIsCompiling(false);
-      setCompilationStatus('idle');
-      
-      // Reset backend compilation state for this project
-      if (currentProject) {
-        try {
-          console.log('Resetting backend compilation state for project:', currentProject.id);
-          await window.electronAPI.compileResetProjectState({ projectId: currentProject.id });
-          console.log('Backend compilation state reset completed');
-        } catch (error) {
-          console.error('Failed to reset backend compilation state:', error);
-        }
-      }
-    }
-    
-    // Save the setting persistently
     try {
+      // Save the setting - the backend service will handle the rest
       await window.electronAPI.settingsSetAutoCompileEnabled({ enabled });
       console.log('Auto-compile setting saved:', enabled);
     } catch (error) {
       console.error('Failed to save auto-compile setting:', error);
-    }
-    
-    // If enabling auto-compile, trigger an immediate compilation to test
-    if (enabled && currentProject) {
-      console.log('Auto-compile enabled - triggering immediate test compilation');
-      
-      // Use a more robust approach that doesn't rely on state closure
-      setTimeout(async () => {
-        console.log('🧪 AUTO-COMPILE TEST: Starting test compilation...');
-        
-        if (!currentProject) {
-          console.log('🧪 AUTO-COMPILE TEST: No project, skipping');
-          return;
-        }
-        
-        console.log('🧪 AUTO-COMPILE TEST: Triggering auto-compile for project:', currentProject.id);
-        
-        try {
-          // Use the trigger API instead of the full compile to test auto-compile
-          const result = await window.electronAPI.compileTriggerAutoCompile({
-            projectId: currentProject.id
-          });
-          
-          console.log('🧪 AUTO-COMPILE TEST: Result:', result);
-          
-          if (result.ok) {
-            console.log('🧪 AUTO-COMPILE TEST: Successfully triggered auto-compile');
-          } else {
-            console.warn('🧪 AUTO-COMPILE TEST: Failed to trigger auto-compile:', result);
-          }
-        } catch (error) {
-          console.error('🧪 AUTO-COMPILE TEST: Error:', error);
-        }
-      }, 500); // Increased delay to ensure backend reset is complete
+      // Revert the local state if saving failed
+      setIsAutoCompileEnabled(!enabled);
     }
   };
 

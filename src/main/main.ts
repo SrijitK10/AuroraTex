@@ -5,6 +5,7 @@ import { FileService } from './services/FileService';
 import { ProjectService } from './services/ProjectService';
 import { SettingsService } from './services/SettingsService';
 import { CompileOrchestrator } from './services/CompileOrchestrator';
+import { AutoCompileService } from './services/AutoCompileService';
 import { SnapshotService } from './services/SnapshotService';
 import { TemplateService } from './services/TemplateService';
 import { SnippetService } from './services/SnippetService';
@@ -16,16 +17,18 @@ class App {
   private projectService: ProjectService;
   private settingsService: SettingsService;
   private compileOrchestrator: CompileOrchestrator;
+  private autoCompileService: AutoCompileService;
   private snapshotService: SnapshotService;
   private templateService: TemplateService;
   private snippetService: SnippetService;
   private bibTexService: BibTeXService;
 
   constructor() {
-    this.fileService = new FileService();
     this.projectService = new ProjectService();
     this.settingsService = new SettingsService();
     this.compileOrchestrator = new CompileOrchestrator();
+    this.autoCompileService = new AutoCompileService(this.compileOrchestrator, this.settingsService);
+    this.fileService = new FileService(this.autoCompileService);
     this.snapshotService = new SnapshotService(this.projectService);
     this.templateService = new TemplateService();
     this.snippetService = new SnippetService();
@@ -48,6 +51,7 @@ class App {
 
   async cleanup() {
     await this.fileService.stopAllWatching();
+    this.autoCompileService.destroy();
   }
 
   public createMainWindow() {
@@ -189,24 +193,19 @@ class App {
     });
 
     ipcMain.handle('Compile.TriggerAutoCompile', async (_, payload) => {
-      // Check if auto-compile is enabled before triggering
-      const isEnabled = await this.settingsService.get('autoCompileEnabled') || false;
-      if (!isEnabled) {
-        console.log(`[Main] Auto-compile skipped for project ${payload.projectId} - auto-compile is disabled`);
-        return { skipped: true, reason: 'auto-compile disabled' };
-      }
-      
-      return this.compileOrchestrator.triggerAutoCompile(payload.projectId);
+      console.log(`[Main] Auto-compile trigger requested for project: ${payload.projectId}`);
+      this.autoCompileService.triggerCompile(payload.projectId);
+      return { ok: true };
     });
 
     // Auto-compile delay settings
     ipcMain.handle('Compile.SetAutoCompileDelay', async (_, payload) => {
-      this.compileOrchestrator.setAutoCompileDelay(payload.delayMs);
+      await this.autoCompileService.setDelay(payload.delayMs);
       return { ok: true };
     });
 
     ipcMain.handle('Compile.GetAutoCompileDelay', async () => {
-      return { delayMs: this.compileOrchestrator.getAutoCompileDelay() };
+      return { delayMs: this.autoCompileService.getDelay() };
     });
 
     // Reset compilation state for a project
@@ -341,11 +340,11 @@ class App {
 
     // Auto-compile settings handlers
     ipcMain.handle('Settings.GetAutoCompileEnabled', async () => {
-      return { enabled: await this.settingsService.get('autoCompileEnabled') || false };
+      return { enabled: this.autoCompileService.getEnabled() };
     });
 
     ipcMain.handle('Settings.SetAutoCompileEnabled', async (_, payload) => {
-      await this.settingsService.set('autoCompileEnabled', payload.enabled);
+      await this.autoCompileService.setEnabled(payload.enabled);
       return { ok: true };
     });
 

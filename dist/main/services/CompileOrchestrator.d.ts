@@ -21,7 +21,10 @@ export declare class CompileOrchestrator extends EventEmitter {
     setAutoCompileDelay(delayMs: number): void;
     getAutoCompileDelay(): number;
     resetProjectState(projectId: string): void;
-    triggerAutoCompile(projectId: string): void;
+    triggerAutoCompile(projectId: string): {
+        ok: boolean;
+        scheduled: boolean;
+    };
     private handleAutoCompile;
     getQueueState(): {
         state: 'idle' | 'queued' | 'building';

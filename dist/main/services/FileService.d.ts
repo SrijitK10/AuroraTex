@@ -1,11 +1,13 @@
 import { FileNode } from '../types';
+import { AutoCompileService } from './AutoCompileService';
 import { BrowserWindow } from 'electron';
 export declare class FileService {
     private projectService;
+    private autoCompileService?;
     private watchers;
     private internalWrites;
     private recentWrites;
-    constructor();
+    constructor(autoCompileService?: AutoCompileService);
     private getProjectRoot;
     private validatePath;
     listTree(projectId: string): Promise<FileNode[]>;

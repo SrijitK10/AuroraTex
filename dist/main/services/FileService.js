@@ -7,11 +7,12 @@ const fs_1 = require("fs");
 const chokidar_1 = require("chokidar");
 const ProjectService_1 = require("./ProjectService");
 class FileService {
-    constructor() {
+    constructor(autoCompileService) {
         this.watchers = new Map();
         this.internalWrites = new Map(); // projectId -> set of file paths being written internally
         this.recentWrites = new Map(); // projectId -> (relPath -> timestamp)
         this.projectService = new ProjectService_1.ProjectService();
+        this.autoCompileService = autoCompileService;
     }
     async getProjectRoot(projectId) {
         const project = await this.projectService.getById(projectId);
@@ -114,6 +115,11 @@ class FileService {
             await (0, promises_1.rename)(tempPath, absolutePath);
             const stats = await (0, promises_1.stat)(absolutePath);
             console.log(`[FileService] File write completed for: ${relPath} at ${Date.now()} (autosave: ${isAutosave})`);
+            // Trigger auto-compile for .tex files if auto-compile service is available
+            if (this.autoCompileService && relPath.endsWith('.tex')) {
+                console.log(`[FileService] Triggering auto-compile for .tex file: ${relPath}`);
+                this.autoCompileService.triggerCompile(projectId);
+            }
             // For autosave, use a longer timeout to avoid false positives
             const clearTimeout = isAutosave ? 15000 : 10000;
             const recentTimeout = isAutosave ? 20000 : 15000;

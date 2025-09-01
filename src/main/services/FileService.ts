@@ -4,16 +4,19 @@ import { existsSync, statSync } from 'fs';
 import { watch, FSWatcher } from 'chokidar';
 import { FileNode } from '../types';
 import { ProjectService } from './ProjectService';
+import { AutoCompileService } from './AutoCompileService';
 import { BrowserWindow } from 'electron';
 
 export class FileService {
   private projectService: ProjectService;
+  private autoCompileService?: AutoCompileService;
   private watchers: Map<string, FSWatcher> = new Map();
   private internalWrites: Map<string, Set<string>> = new Map(); // projectId -> set of file paths being written internally
   private recentWrites: Map<string, Map<string, number>> = new Map(); // projectId -> (relPath -> timestamp)
 
-  constructor() {
+  constructor(autoCompileService?: AutoCompileService) {
     this.projectService = new ProjectService();
+    this.autoCompileService = autoCompileService;
   }
 
   private async getProjectRoot(projectId: string): Promise<string> {
@@ -141,6 +144,12 @@ export class FileService {
       const stats = await stat(absolutePath);
       
       console.log(`[FileService] File write completed for: ${relPath} at ${Date.now()} (autosave: ${isAutosave})`);
+      
+      // Trigger auto-compile for .tex files if auto-compile service is available
+      if (this.autoCompileService && relPath.endsWith('.tex')) {
+        console.log(`[FileService] Triggering auto-compile for .tex file: ${relPath}`);
+        this.autoCompileService.triggerCompile(projectId);
+      }
       
       // For autosave, use a longer timeout to avoid false positives
       const clearTimeout = isAutosave ? 15000 : 10000;

@@ -79,7 +79,7 @@ export class CompileOrchestrator extends EventEmitter {
   private lastCompileEnd: Map<string, number> = new Map(); // projectId -> timestamp
   private pendingAutoCompile: Map<string, boolean> = new Map(); // projectId -> needsBuild flag
   private autoCompileDebounceMs = 750; // Default 750ms debounce
-  private autoCompileMinInterval = 5000; // 5 seconds minimum between auto-compiles
+  private autoCompileMinInterval = 2000; // 2 seconds minimum between auto-compiles
 
   // Milestone 13: Incremental build management
   private persistentBuildDirs: Map<string, string> = new Map(); // projectId -> buildDir
@@ -126,13 +126,14 @@ export class CompileOrchestrator extends EventEmitter {
   }
 
   // Milestone 5: Debounced auto-compile triggered by file saves
-  triggerAutoCompile(projectId: string): void {
+  triggerAutoCompile(projectId: string): { ok: boolean; scheduled: boolean } {
     console.log(`[CompileOrchestrator] Auto-compile triggered for project: ${projectId}`);
     
     // Clear existing timer
     const existingTimer = this.autoCompileTimers.get(projectId);
     if (existingTimer) {
       clearTimeout(existingTimer);
+      console.log(`[CompileOrchestrator] Cleared existing auto-compile timer for project: ${projectId}`);
     }
 
     // Set new debounced timer
@@ -142,12 +143,19 @@ export class CompileOrchestrator extends EventEmitter {
     }, this.autoCompileDebounceMs);
 
     this.autoCompileTimers.set(projectId, timer);
+    console.log(`[CompileOrchestrator] Auto-compile scheduled for project: ${projectId} in ${this.autoCompileDebounceMs}ms`);
+    
+    return { ok: true, scheduled: true };
   }
 
   // Milestone 5: Handle auto-compile with coalescing logic
   private async handleAutoCompile(projectId: string): Promise<void> {
+    console.log(`[CompileOrchestrator] handleAutoCompile called for project: ${projectId}`);
+    
     const lastCompileTime = this.lastCompileEnd.get(projectId) || 0;
     const timeSinceLastCompile = Date.now() - lastCompileTime;
+
+    console.log(`[CompileOrchestrator] Time since last compile: ${timeSinceLastCompile}ms (min required: ${this.autoCompileMinInterval}ms)`);
 
     // Check if there's already a running job for this project
     const runningJob = Array.from(this.jobs.values()).find(
@@ -157,7 +165,7 @@ export class CompileOrchestrator extends EventEmitter {
     if (runningJob) {
       // Mark that we need to build again after current job finishes
       this.pendingAutoCompile.set(projectId, true);
-      console.log(`[CompileOrchestrator] Marking auto-compile as pending for project: ${projectId}`);
+      console.log(`[CompileOrchestrator] Job already running, marking auto-compile as pending for project: ${projectId}`);
       return;
     }
 
@@ -165,16 +173,17 @@ export class CompileOrchestrator extends EventEmitter {
     if (timeSinceLastCompile < this.autoCompileMinInterval) {
       // Mark as pending and wait
       this.pendingAutoCompile.set(projectId, true);
-      console.log(`[CompileOrchestrator] Auto-compile too soon, marking as pending for project: ${projectId}`);
+      console.log(`[CompileOrchestrator] Auto-compile too soon (${timeSinceLastCompile}ms < ${this.autoCompileMinInterval}ms), marking as pending for project: ${projectId}`);
       return;
     }
 
     // Clear pending flag and trigger compile
     this.pendingAutoCompile.set(projectId, false);
+    console.log(`[CompileOrchestrator] Starting auto-compile for project: ${projectId}`);
     
     try {
-      await this.run(projectId, undefined, undefined, true); // isAutoCompile = true
-      console.log(`[CompileOrchestrator] Auto-compile started for project: ${projectId}`);
+      const result = await this.run(projectId, undefined, undefined, true); // isAutoCompile = true
+      console.log(`[CompileOrchestrator] Auto-compile started successfully for project: ${projectId}, jobId: ${result.jobId}`);
     } catch (error) {
       console.error(`[CompileOrchestrator] Failed to start auto-compile for project: ${projectId}`, error);
     }
@@ -571,10 +580,18 @@ export class CompileOrchestrator extends EventEmitter {
       
       // Check for pending auto-compile
       if (this.pendingAutoCompile.get(job.projectId)) {
-        console.log(`[CompileOrchestrator] Checking pending auto-compile for project: ${job.projectId}`);
+        console.log(`[CompileOrchestrator] Processing pending auto-compile for project: ${job.projectId}`);
+        // Clear the pending flag first to avoid loops
+        this.pendingAutoCompile.set(job.projectId, false);
+        
+        // For pending auto-compiles, use a longer delay to respect the minimum interval
+        const remainingInterval = this.autoCompileMinInterval - 1000; // Account for the 1s we already waited
+        const delay = Math.max(remainingInterval, 1000); // At least 1s delay
+        
+        console.log(`[CompileOrchestrator] Scheduling pending auto-compile with ${delay}ms delay`);
         setTimeout(() => {
           this.handleAutoCompile(job.projectId);
-        }, 1000); // Brief delay to allow for UI updates
+        }, delay);
       }
       
       this.emitQueueStateChange();

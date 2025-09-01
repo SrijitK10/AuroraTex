@@ -7,6 +7,7 @@ const FileService_1 = require("./services/FileService");
 const ProjectService_1 = require("./services/ProjectService");
 const SettingsService_1 = require("./services/SettingsService");
 const CompileOrchestrator_1 = require("./services/CompileOrchestrator");
+const AutoCompileService_1 = require("./services/AutoCompileService");
 const SnapshotService_1 = require("./services/SnapshotService");
 const TemplateService_1 = require("./services/TemplateService");
 const SnippetService_1 = require("./services/SnippetService");
@@ -14,10 +15,11 @@ const BibTeXService_1 = require("./services/BibTeXService");
 class App {
     constructor() {
         this.mainWindow = null;
-        this.fileService = new FileService_1.FileService();
         this.projectService = new ProjectService_1.ProjectService();
         this.settingsService = new SettingsService_1.SettingsService();
         this.compileOrchestrator = new CompileOrchestrator_1.CompileOrchestrator();
+        this.autoCompileService = new AutoCompileService_1.AutoCompileService(this.compileOrchestrator, this.settingsService);
+        this.fileService = new FileService_1.FileService(this.autoCompileService);
         this.snapshotService = new SnapshotService_1.SnapshotService(this.projectService);
         this.templateService = new TemplateService_1.TemplateService();
         this.snippetService = new SnippetService_1.SnippetService();
@@ -36,6 +38,7 @@ class App {
     }
     async cleanup() {
         await this.fileService.stopAllWatching();
+        this.autoCompileService.destroy();
     }
     createMainWindow() {
         this.createWindow();
@@ -152,21 +155,17 @@ class App {
             return this.compileOrchestrator.getQueueState();
         });
         electron_1.ipcMain.handle('Compile.TriggerAutoCompile', async (_, payload) => {
-            // Check if auto-compile is enabled before triggering
-            const isEnabled = await this.settingsService.get('autoCompileEnabled') || false;
-            if (!isEnabled) {
-                console.log(`[Main] Auto-compile skipped for project ${payload.projectId} - auto-compile is disabled`);
-                return { skipped: true, reason: 'auto-compile disabled' };
-            }
-            return this.compileOrchestrator.triggerAutoCompile(payload.projectId);
+            console.log(`[Main] Auto-compile trigger requested for project: ${payload.projectId}`);
+            this.autoCompileService.triggerCompile(payload.projectId);
+            return { ok: true };
         });
         // Auto-compile delay settings
         electron_1.ipcMain.handle('Compile.SetAutoCompileDelay', async (_, payload) => {
-            this.compileOrchestrator.setAutoCompileDelay(payload.delayMs);
+            await this.autoCompileService.setDelay(payload.delayMs);
             return { ok: true };
         });
         electron_1.ipcMain.handle('Compile.GetAutoCompileDelay', async () => {
-            return { delayMs: this.compileOrchestrator.getAutoCompileDelay() };
+            return { delayMs: this.autoCompileService.getDelay() };
         });
         // Reset compilation state for a project
         electron_1.ipcMain.handle('Compile.ResetProjectState', async (_, payload) => {
@@ -277,10 +276,10 @@ class App {
         });
         // Auto-compile settings handlers
         electron_1.ipcMain.handle('Settings.GetAutoCompileEnabled', async () => {
-            return { enabled: await this.settingsService.get('autoCompileEnabled') || false };
+            return { enabled: this.autoCompileService.getEnabled() };
         });
         electron_1.ipcMain.handle('Settings.SetAutoCompileEnabled', async (_, payload) => {
-            await this.settingsService.set('autoCompileEnabled', payload.enabled);
+            await this.autoCompileService.setEnabled(payload.enabled);
             return { ok: true };
         });
         electron_1.ipcMain.handle('Settings.GetRecentProjects', async () => {

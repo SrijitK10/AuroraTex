@@ -20,6 +20,24 @@ export const ImageOverlay: React.FC<ImageOverlayProps> = ({
   const [error, setError] = useState<string>('');
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
 
+  // Handle escape key to close overlay
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isVisible) {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }
+    };
+
+    if (isVisible) {
+      // Add event listener with capture = true to handle before other listeners
+      document.addEventListener('keydown', handleKeyDown, { capture: true });
+    }
+
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isVisible, onClose]);
+
   useEffect(() => {
     if (!isVisible || !filePath) {
       setImageUrl('');
