@@ -157,8 +157,9 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       // Get device pixel ratio for high-DPI displays (retina, etc.)
       const devicePixelRatio = window.devicePixelRatio || 1;
       
-      // Calculate effective scale accounting for device pixel ratio
-      const effectiveScale = scale * devicePixelRatio;
+      // Always render at base scale (1.2) since we use CSS transform for zoom
+      const baseScale = 1.2;
+      const effectiveScale = baseScale * devicePixelRatio;
       
       // Get viewport with the effective scale
       const viewport = page.getViewport({ scale: effectiveScale });
@@ -188,13 +189,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       
       const renderContext = {
         canvasContext: context,
-        viewport: page.getViewport({ scale }), // Use original scale for rendering context
+        viewport: page.getViewport({ scale: baseScale }), // Use base scale for rendering context
       };
       
       const renderTask = page.render(renderContext);
       await renderTask.promise;
       
-      console.log(`Rendered page ${pageNum} at scale ${scale} with DPR ${devicePixelRatio} (${viewport.width}x${viewport.height})`);
+      console.log(`Rendered page ${pageNum} at base scale ${baseScale} with DPR ${devicePixelRatio}, visual zoom: ${scale} (${viewport.width}x${viewport.height})`);
     } catch (err) {
       console.error('Error rendering page:', err);
       setError('Failed to render PDF page');
@@ -227,7 +228,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   }, [refreshTrigger, projectId]);
 
   useEffect(() => {
-    console.log(`Scale changed to ${scale}, pdfDoc exists: ${!!pdfDoc}, currentPage: ${currentPage}`);
+    console.log(`Page or document changed - pdfDoc exists: ${!!pdfDoc}, currentPage: ${currentPage}`);
     if (pdfDoc && currentPage) {
       renderPage(currentPage);
       
@@ -236,7 +237,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         restoreViewState();
       }
     }
-  }, [pdfDoc, currentPage, scale, isIncrementalRefresh, restoreViewState]);
+  }, [pdfDoc, currentPage, isIncrementalRefresh, restoreViewState]);
 
   // Auto-refresh every 5 seconds to pick up new PDFs (less frequent now since we have triggers)
   useEffect(() => {
@@ -272,9 +273,40 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     setScale(1.2); // Reset to the new default scale
   };
 
+  // Add keyboard shortcut support for zoom (like VS Code)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle if the PDF viewer container is focused or contains the active element
+      if (containerRef.current && (containerRef.current.contains(document.activeElement) || document.activeElement === containerRef.current)) {
+        if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey) {
+          if (event.key === '=' || event.key === '+') {
+            event.preventDefault();
+            zoomIn();
+          } else if (event.key === '-') {
+            event.preventDefault();
+            zoomOut();
+          } else if (event.key === '0') {
+            event.preventDefault();
+            resetZoom();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [scale]);
+
+  // Make the container focusable for keyboard shortcuts
+  const handleContainerClick = () => {
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-white border-l border-gray-200">
-      {/* PDF Toolbar */}
+      {/* PDF Header */}
       <div className="flex-shrink-0 p-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-medium text-gray-900">PDF Preview</h3>
@@ -321,75 +353,44 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           </div>
         </div>
 
-        {/* Navigation Controls */}
+        {/* Navigation Controls under PDF Preview */}
         {pdfDoc && (
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage <= 1}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
+          <div className="flex items-center space-x-2 text-sm">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
 
-              <span className="text-gray-600">
-                {currentPage} / {totalPages}
-              </span>
+            <span className="text-gray-600">
+              {currentPage} / {totalPages}
+            </span>
 
-              <button
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage >= totalPages}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Zoom Controls */}
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={zoomOut}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                title="Zoom Out"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                </svg>
-              </button>
-
-              <span className="text-xs text-gray-500 w-12 text-center">
-                {Math.round(scale * 100)}%
-              </span>
-
-              <button
-                onClick={zoomIn}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600"
-                title="Zoom In"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-
-              <button
-                onClick={resetZoom}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600 text-xs"
-                title="Reset Zoom (120%)"
-              >
-                Reset
-              </button>
-            </div>
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
 
       {/* PDF Content */}
-      <div ref={containerRef} className="flex-1 bg-gray-100 overflow-hidden">
+      <div 
+        ref={containerRef} 
+        className="flex-1 bg-gray-100 overflow-hidden relative"
+        tabIndex={0}
+        onClick={handleContainerClick}
+        style={{ outline: 'none' }}
+      >
         <div 
           className="h-full w-full overflow-auto p-4" 
           style={{
@@ -425,17 +426,56 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
 
           {pdfDoc && !loading && !error && (
             <div className="flex justify-center min-h-full">
-              <canvas
-                ref={canvasRef}
-                className="shadow-lg border border-gray-300 bg-white"
-                style={{ 
-                  display: 'block',
-                  imageRendering: 'crisp-edges' as any
-                }}
-              />
+              <div style={{ transform: `scale(${scale / 1.2})`, transformOrigin: 'center top' }}>
+                <canvas
+                  ref={canvasRef}
+                  className="shadow-lg border border-gray-300 bg-white"
+                  style={{ 
+                    display: 'block',
+                    imageRendering: 'crisp-edges' as any
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
+
+        {/* Zoom Controls - Bottom Left */}
+        {pdfDoc && !loading && !error && (
+          <div className="absolute bottom-4 left-4 flex items-center space-x-1 bg-white border border-gray-300 rounded-lg shadow-md px-2 py-1">
+            <button
+              onClick={zoomOut}
+              className="p-1 rounded hover:bg-gray-100 text-gray-600"
+              title="Zoom Out"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+
+            <span className="text-xs text-gray-500 w-12 text-center">
+              {Math.round(scale * 100)}%
+            </span>
+
+            <button
+              onClick={zoomIn}
+              className="p-1 rounded hover:bg-gray-100 text-gray-600"
+              title="Zoom In"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+
+            <button
+              onClick={resetZoom}
+              className="p-1 rounded hover:bg-gray-100 text-gray-600 text-xs"
+              title="Reset Zoom (120%)"
+            >
+              Reset
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
