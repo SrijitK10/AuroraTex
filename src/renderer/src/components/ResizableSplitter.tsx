@@ -7,6 +7,9 @@ interface ResizableSplitterProps {
   minLeft?: number; // minimum width in pixels
   minRight?: number; // minimum width in pixels
   className?: string;
+  collapseThreshold?: number; // pixels - when to auto-collapse the left panel
+  onLeftCollapse?: (collapsed: boolean) => void; // callback when left panel collapses/expands
+  leftCollapsed?: boolean; // external control of collapsed state
 }
 
 export const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
@@ -16,9 +19,15 @@ export const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   minLeft = 200,
   minRight = 200,
   className = '',
+  collapseThreshold = 100,
+  onLeftCollapse,
+  leftCollapsed,
 }) => {
   const [split, setSplit] = useState(defaultSplit);
   const [isDragging, setIsDragging] = useState(false);
+  const [isLeftCollapsed, setIsLeftCollapsed] = useState(leftCollapsed || false);
+  const [lastSplitBeforeCollapse, setLastSplitBeforeCollapse] = useState(defaultSplit);
+  const [isNearCollapseThreshold, setIsNearCollapseThreshold] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -34,23 +43,79 @@ export const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
       const containerWidth = containerRect.width;
       const mouseX = e.clientX - containerRect.left;
       
-      // Calculate new split percentage
-      let newSplit = (mouseX / containerWidth) * 100;
+      // Calculate raw mouse position as pixel width
+      const rawLeftWidth = mouseX;
       
-      // Apply minimum constraints
-      const minLeftPercent = (minLeft / containerWidth) * 100;
-      const minRightPercent = (minRight / containerWidth) * 100;
+      // Check for collapse threshold BEFORE applying constraints
+      if (rawLeftWidth < collapseThreshold && !isLeftCollapsed) {
+        // Collapse the left panel
+        setLastSplitBeforeCollapse(split);
+        setIsLeftCollapsed(true);
+        setIsNearCollapseThreshold(false);
+        onLeftCollapse?.(true);
+        return; // Exit early when collapsing
+      } else if (rawLeftWidth >= collapseThreshold && isLeftCollapsed) {
+        // Expand the left panel and set position based on mouse
+        setIsLeftCollapsed(false);
+        setIsNearCollapseThreshold(false);
+        onLeftCollapse?.(false);
+        
+        // Calculate split for current mouse position
+        let newSplit = (mouseX / containerWidth) * 100;
+        const minLeftPercent = (minLeft / containerWidth) * 100;
+        const minRightPercent = (minRight / containerWidth) * 100;
+        newSplit = Math.max(minLeftPercent, Math.min(100 - minRightPercent, newSplit));
+        setSplit(newSplit);
+        return;
+      }
       
-      newSplit = Math.max(minLeftPercent, Math.min(100 - minRightPercent, newSplit));
+      // Check if we're near the collapse threshold (for visual feedback)
+      const nearThreshold = rawLeftWidth < collapseThreshold * 1.5 && !isLeftCollapsed;
+      setIsNearCollapseThreshold(nearThreshold);
       
-      setSplit(newSplit);
+      // Only update split if not collapsed
+      if (!isLeftCollapsed) {
+        // Calculate new split percentage
+        let newSplit = (mouseX / containerWidth) * 100;
+        
+        // Apply minimum constraints
+        const minLeftPercent = (minLeft / containerWidth) * 100;
+        const minRightPercent = (minRight / containerWidth) * 100;
+        
+        newSplit = Math.max(minLeftPercent, Math.min(100 - minRightPercent, newSplit));
+        setSplit(newSplit);
+      }
     },
-    [isDragging, minLeft, minRight]
+    [isDragging, minLeft, minRight, collapseThreshold, isLeftCollapsed, split, onLeftCollapse]
   );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    setIsNearCollapseThreshold(false);
   }, []);
+
+  const handleExpandClick = useCallback(() => {
+    if (isLeftCollapsed) {
+      setIsLeftCollapsed(false);
+      setSplit(lastSplitBeforeCollapse);
+      onLeftCollapse?.(false);
+    }
+  }, [isLeftCollapsed, lastSplitBeforeCollapse, onLeftCollapse]);
+
+  // Sync external collapsed state
+  useEffect(() => {
+    if (leftCollapsed !== undefined && leftCollapsed !== isLeftCollapsed) {
+      if (leftCollapsed && !isLeftCollapsed) {
+        // External wants to collapse
+        setLastSplitBeforeCollapse(split);
+        setIsLeftCollapsed(true);
+      } else if (!leftCollapsed && isLeftCollapsed) {
+        // External wants to expand
+        setIsLeftCollapsed(false);
+        setSplit(lastSplitBeforeCollapse);
+      }
+    }
+  }, [leftCollapsed, isLeftCollapsed, split, lastSplitBeforeCollapse]);
 
   useEffect(() => {
     if (isDragging) {
@@ -80,32 +145,64 @@ export const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     >
       {/* Left panel */}
       <div 
-        style={{ width: `${split}%` }}
+        style={{ 
+          width: isLeftCollapsed ? '0px' : `${split}%`, 
+          minWidth: isLeftCollapsed ? '0px' : `${minLeft}px`,
+          flexShrink: 0,
+          flexGrow: 0
+        }}
         className="flex flex-col overflow-hidden"
       >
-        {left}
+        {!isLeftCollapsed && left}
       </div>
       
-      {/* Resizer */}
+      {/* Resizer or Expand Button */}
       <div
-        className={`w-1 bg-gray-300 hover:bg-blue-400 cursor-col-resize transition-colors duration-150 relative group ${
-          isDragging ? 'bg-blue-500' : ''
+        className={`w-1 transition-colors duration-150 relative group flex-shrink-0 ${
+          isLeftCollapsed 
+            ? 'bg-blue-400 hover:bg-blue-500 cursor-pointer' 
+            : isNearCollapseThreshold 
+              ? 'bg-orange-400 hover:bg-orange-500 cursor-col-resize' 
+              : isDragging 
+                ? 'bg-blue-500' 
+                : 'bg-gray-300 hover:bg-blue-400 cursor-col-resize'
         }`}
-        onMouseDown={handleMouseDown}
+        onMouseDown={isLeftCollapsed ? undefined : handleMouseDown}
+        onClick={isLeftCollapsed ? handleExpandClick : undefined}
+        style={{
+          cursor: isLeftCollapsed ? 'pointer' : 'col-resize'
+        }}
       >
-        {/* Visual indicator dots */}
-        <div className="absolute inset-y-0 left-0 w-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="w-0.5 h-8 bg-white rounded-full shadow-sm flex flex-col justify-center items-center space-y-0.5">
-            <div className="w-0.5 h-0.5 bg-gray-600 rounded-full"></div>
-            <div className="w-0.5 h-0.5 bg-gray-600 rounded-full"></div>
-            <div className="w-0.5 h-0.5 bg-gray-600 rounded-full"></div>
-          </div>
+        {/* Visual indicator */}
+        <div className={`absolute inset-y-0 left-0 w-full flex items-center justify-center transition-opacity ${
+          isLeftCollapsed ? 'opacity-60 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
+          {isLeftCollapsed ? (
+            /* Expand indicator */
+            <div className="w-1 h-8 bg-blue-500 rounded-full shadow-sm flex items-center justify-center">
+              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          ) : (
+            /* Resize dots indicator */
+            <div className="w-0.5 h-8 bg-white rounded-full shadow-sm flex flex-col justify-center items-center space-y-0.5">
+              <div className="w-0.5 h-0.5 bg-gray-600 rounded-full"></div>
+              <div className="w-0.5 h-0.5 bg-gray-600 rounded-full"></div>
+              <div className="w-0.5 h-0.5 bg-gray-600 rounded-full"></div>
+            </div>
+          )}
         </div>
       </div>
       
       {/* Right panel */}
       <div 
-        style={{ width: `${100 - split}%` }}
+        style={{ 
+          width: isLeftCollapsed ? 'calc(100% - 4px)' : `${100 - split}%`, 
+          minWidth: `${minRight}px`,
+          flexShrink: 0,
+          flexGrow: 0
+        }}
         className="flex flex-col overflow-hidden"
       >
         {right}

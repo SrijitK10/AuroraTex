@@ -67,9 +67,13 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   }, [savedViewState, loading]);
 
   const loadPDF = async (isIncremental = false) => {
-    if (!projectId) return;
+    if (!projectId) {
+      console.log('No projectId provided, skipping PDF load');
+      return;
+    }
 
     try {
+      console.log(`Loading PDF for project ${projectId}, incremental: ${isIncremental}`);
       setLoading(true);
       setError(null);
       
@@ -217,7 +221,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   // Respond to external refresh triggers (from compile success)
   useEffect(() => {
     if (refreshTrigger > 0 && projectId) {
-      console.log('PDF refresh triggered by compilation');
+      console.log(`PDF refresh triggered by compilation - trigger: ${refreshTrigger}`);
       loadPDF(true); // Mark as potentially incremental
     }
   }, [refreshTrigger, projectId]);
@@ -271,7 +275,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   return (
     <div className="h-full flex flex-col bg-white border-l border-gray-200">
       {/* PDF Toolbar */}
-      <div className="p-3 border-b border-gray-200 bg-gray-50">
+      <div className="flex-shrink-0 p-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-medium text-gray-900">PDF Preview</h3>
           <div className="flex items-center space-x-2">
@@ -387,10 +391,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       {/* PDF Content */}
       <div ref={containerRef} className="flex-1 bg-gray-100 overflow-hidden">
         <div 
-          className="h-full overflow-y-auto overflow-x-auto p-4 pdf-scroll-container" 
-          style={{ 
-            scrollbarWidth: 'auto', 
-            scrollbarColor: '#cbd5e1 #f1f5f9',
+          className="h-full w-full overflow-auto p-4" 
+          style={{
+            scrollbarWidth: 'auto',
+            scrollbarColor: '#cbd5e1 #f1f5f9'
           }}
         >
           {loading && (
@@ -420,10 +424,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           )}
 
           {pdfDoc && !loading && !error && (
-            <div className="w-max mx-auto min-h-full">
+            <div className="flex justify-center min-h-full">
               <canvas
                 ref={canvasRef}
-                className="shadow-lg border border-gray-300 bg-white block"
+                className="shadow-lg border border-gray-300 bg-white"
                 style={{ 
                   display: 'block',
                   imageRendering: 'crisp-edges' as any

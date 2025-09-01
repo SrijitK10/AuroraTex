@@ -11,6 +11,7 @@ import { HistoryPanel } from './components/HistoryPanel';
 import { SnippetsPalette } from './components/SnippetsPalette';
 import { BibManager } from './components/BibManager';
 import { Topbar } from './components/Topbar';
+import { ActionSidebar } from './components/ActionSidebar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
 import SettingsModal from './components/SettingsModal';
@@ -112,6 +113,7 @@ function App() {
   const [showQuickFileSearch, setShowQuickFileSearch] = useState(false);
   const [useVirtualizedFileTree, setUseVirtualizedFileTree] = useState(false);
   const [isIncrementalBuildEnabled, setIsIncrementalBuildEnabled] = useState(true);
+  const [isFileCreationActive, setIsFileCreationActive] = useState(false);
 
   // Image overlay state (isolated - doesn't interfere with existing functionality)
   const [showImageOverlay, setShowImageOverlay] = useState(false);
@@ -190,7 +192,9 @@ function App() {
           !showHistoryPanel &&
           !showSnippetsPalette &&
           !showQuickFileSearch &&
-          !showImageOverlay) {
+          !showImageOverlay &&
+          !showBibManager &&
+          !isFileCreationActive) {
         event.preventDefault();
         handleEscapeBackToProjects();
       }
@@ -198,7 +202,7 @@ function App() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, isAutoCompileEnabled, showLogPanel, showErrorsPanel, showHistoryPanel, showSnippetsPalette, showQuickFileSearch, showImageOverlay]);
+  }, [currentProject, isAutoCompileEnabled, showLogPanel, showErrorsPanel, showHistoryPanel, showSnippetsPalette, showQuickFileSearch, showImageOverlay, showBibManager, isFileCreationActive]);
 
   // Load file tree when project changes
   useEffect(() => {
@@ -292,7 +296,12 @@ function App() {
       if (data.projectId === currentProject?.id) {
         if (data.state === 'success') {
           console.log('[App] Auto-compile successful - refreshing PDF');
-          setPdfRefreshTrigger(prev => prev + 1);
+          console.log('[App] Current pdfRefreshTrigger:', pdfRefreshTrigger);
+          setPdfRefreshTrigger(prev => {
+            const newTrigger = prev + 1;
+            console.log('[App] Setting new pdfRefreshTrigger to:', newTrigger);
+            return newTrigger;
+          });
         } else if (data.state === 'error') {
           console.log('[App] Auto-compile failed:', data.message);
         }
@@ -738,8 +747,13 @@ function App() {
             setIsCompiling(false);
             setCompilationStatus('success');
             // Milestone 4: Auto-refresh PDF viewer on success
-            console.log('Compilation successful - refreshing PDF');
-            setPdfRefreshTrigger(prev => prev + 1);
+            console.log('Manual compilation successful - refreshing PDF');
+            console.log('Current pdfRefreshTrigger:', pdfRefreshTrigger);
+            setPdfRefreshTrigger(prev => {
+              const newTrigger = prev + 1;
+              console.log('Setting new pdfRefreshTrigger to:', newTrigger);
+              return newTrigger;
+            });
             // Milestone 6: Fetch and process errors (might have warnings even on success)
             fetchAndProcessErrors(data.jobId || result.jobId);
             window.electronAPI.removeCompileProgressListener(handleProgress);
@@ -1002,79 +1016,102 @@ function App() {
         project={currentProject}
         isCompiling={isCompiling}
         onCompile={() => compileProject()}
-        onCleanBuild={handleCleanBuild}
-        onToggleLog={() => setShowLogPanel(!showLogPanel)}
-        showSidebar={showSidebar}
-        onToggleSidebar={() => setShowSidebar(!showSidebar)}
         onBack={handleBackToProjects}
-        queueState={queueState}
-        showErrorsPanel={showErrorsPanel}
-        onToggleErrorsPanel={() => setShowErrorsPanel(!showErrorsPanel)}
-        errorCount={errors.length}
-        showHistoryPanel={showHistoryPanel}
-        onToggleHistoryPanel={() => setShowHistoryPanel(!showHistoryPanel)}
-        onOpenSnippets={() => setShowSnippetsPalette(true)}
-        onOpenBibliography={handleOpenBibliography}
         onOpenSettings={() => setShowSettingsModal(true)}
-        onQuickFileSearch={() => setShowQuickFileSearch(true)}
+        queueState={queueState}
       />
       
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        <CollapsibleSidebar 
-          isVisible={showSidebar}
-          onToggle={() => setShowSidebar(!showSidebar)}
-        >
-          {useVirtualizedFileTree ? (
-            <VirtualizedFileTree 
-              files={fileTree}
-              projectId={currentProject.id}
-              onFileSelect={openFile}
-              onRefresh={loadFileTree}
-              onFileCreate={handleFileCreate}
-              onFileDelete={handleFileDelete}
-              onFileRename={handleFileRename}
-              onQuickFileSearch={() => setShowQuickFileSearch(true)}
-              maxVisibleItems={50}
-              itemHeight={32}
-            />
-          ) : (
-            <FileTree 
-              files={fileTree}
-              projectId={currentProject.id}
-              onFileSelect={openFile}
-              onRefresh={loadFileTree}
-              onFileCreate={handleFileCreate}
-              onFileDelete={handleFileDelete}
-              onFileRename={handleFileRename}
-              onQuickFileSearch={() => setShowQuickFileSearch(true)}
-            />
-          )}
-        </CollapsibleSidebar>
+        <ActionSidebar 
+          onCleanBuild={handleCleanBuild}
+          isCompiling={isCompiling}
+          onToggleLog={() => setShowLogPanel(!showLogPanel)}
+          showErrorsPanel={showErrorsPanel}
+          onToggleErrorsPanel={() => setShowErrorsPanel(!showErrorsPanel)}
+          errorCount={errors.length}
+          showHistoryPanel={showHistoryPanel}
+          onToggleHistoryPanel={() => setShowHistoryPanel(!showHistoryPanel)}
+          showSidebar={showSidebar}
+          onToggleSidebar={() => setShowSidebar(!showSidebar)}
+          onQuickFileSearch={() => setShowQuickFileSearch(true)}
+          onOpenSnippets={() => setShowSnippetsPalette(true)}
+          onOpenBibliography={handleOpenBibliography}
+        />
         
         <ResizableSplitter
           left={
-            <Editor
-              ref={editorRef}
-              tabs={openTabs}
-              activeTabId={activeTabId}
-              onTabSelect={setActiveTabId}
-              onTabClose={closeTab}
-              onContentChange={updateTabContent}
-              onSave={saveFile}
-              errorMarkersForFile={errorMarkersForFile}
-              onGotoLine={handleErrorClick}
-            />
+            <CollapsibleSidebar 
+              isVisible={true}
+              onToggle={() => setShowSidebar(!showSidebar)}
+              disableWidthControl={true}
+            >
+              {useVirtualizedFileTree ? (
+                <VirtualizedFileTree 
+                  files={fileTree}
+                  projectId={currentProject.id}
+                  onFileSelect={openFile}
+                  onRefresh={loadFileTree}
+                  onFileCreate={handleFileCreate}
+                  onFileDelete={handleFileDelete}
+                  onFileRename={handleFileRename}
+                  onQuickFileSearch={() => setShowQuickFileSearch(true)}
+                  onFileCreationChange={setIsFileCreationActive}
+                  showSidebar={showSidebar}
+                  onToggleSidebar={() => setShowSidebar(!showSidebar)}
+                  maxVisibleItems={50}
+                  itemHeight={32}
+                />
+              ) : (
+                <FileTree 
+                  files={fileTree}
+                  projectId={currentProject.id}
+                  onFileSelect={openFile}
+                  onRefresh={loadFileTree}
+                  onFileCreate={handleFileCreate}
+                  onFileDelete={handleFileDelete}
+                  onFileRename={handleFileRename}
+                  onQuickFileSearch={() => setShowQuickFileSearch(true)}
+                  onFileCreationChange={setIsFileCreationActive}
+                  showSidebar={showSidebar}
+                  onToggleSidebar={() => setShowSidebar(!showSidebar)}
+                />
+              )}
+            </CollapsibleSidebar>
           }
           right={
-            <PDFViewer 
-              projectId={currentProject?.id || null} 
-              refreshTrigger={pdfRefreshTrigger}
-              compilationStatus={compilationStatus}
+            <ResizableSplitter
+              left={
+                <Editor
+                  ref={editorRef}
+                  tabs={openTabs}
+                  activeTabId={activeTabId}
+                  onTabSelect={setActiveTabId}
+                  onTabClose={closeTab}
+                  onContentChange={updateTabContent}
+                  onSave={saveFile}
+                  errorMarkersForFile={errorMarkersForFile}
+                  onGotoLine={handleErrorClick}
+                />
+              }
+              right={
+                <PDFViewer 
+                  projectId={currentProject?.id || null} 
+                  refreshTrigger={pdfRefreshTrigger}
+                  compilationStatus={compilationStatus}
+                />
+              }
+              defaultSplit={60}
+              minLeft={350}
+              minRight={300}
+              className="flex-1 min-h-0"
             />
           }
-          defaultSplit={60}
-          minLeft={300}
-          minRight={250}
+          defaultSplit={25}
+          minLeft={200}
+          minRight={650}
+          collapseThreshold={120}
+          leftCollapsed={!showSidebar}
+          onLeftCollapse={(collapsed) => setShowSidebar(!collapsed)}
           className="flex-1 min-h-0"
         />
       </div>

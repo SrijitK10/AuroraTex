@@ -5,6 +5,7 @@ interface CollapsibleSidebarProps {
   onToggle: () => void;
   children: React.ReactNode;
   width?: string;
+  disableWidthControl?: boolean; // New prop to disable width control when used with ResizableSplitter
 }
 
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
@@ -12,7 +13,19 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   onToggle,
   children,
   width = 'w-64',
+  disableWidthControl = false,
 }) => {
+  if (disableWidthControl) {
+    // When width is controlled externally (e.g., by ResizableSplitter)
+    // Always render content, but can use isVisible for other visual states if needed
+    return (
+      <div className="bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+        {children}
+      </div>
+    );
+  }
+
+  // Default behavior with internal width control
   return (
     <>
       {/* Sidebar */}

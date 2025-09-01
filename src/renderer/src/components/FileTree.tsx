@@ -18,6 +18,9 @@ interface FileTreeProps {
   onFileDelete?: (path: string) => void;
   onFileRename?: (oldPath: string, newPath: string) => void;
   onQuickFileSearch?: () => void; // Milestone 13: Quick File Search
+  onFileCreationChange?: (isCreating: boolean) => void; // Track file creation state
+  showSidebar?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 interface ContextMenuState {
@@ -36,7 +39,10 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onFileCreate,
   onFileDelete,
   onFileRename,
-  onQuickFileSearch
+  onQuickFileSearch,
+  onFileCreationChange,
+  showSidebar,
+  onToggleSidebar
 }) => {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -69,6 +75,11 @@ export const FileTree: React.FC<FileTreeProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [contextMenu.visible]);
+
+  // Notify parent component when file creation state changes
+  useEffect(() => {
+    onFileCreationChange?.(creatingNode !== null);
+  }, [creatingNode, onFileCreationChange]);
 
   const toggleDirectory = (path: string) => {
     const newExpanded = new Set(expandedDirs);
@@ -401,18 +412,6 @@ export const FileTree: React.FC<FileTreeProps> = ({
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">Files</h3>
           <div className="flex items-center space-x-1">
-            {/* Milestone 13: Quick File Search Button */}
-            {onQuickFileSearch && (
-              <button
-                onClick={onQuickFileSearch}
-                className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                title="Quick File Search (Cmd/Ctrl+P)"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-            )}
             <button
               onClick={() => handleCreateFile()}
               className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"

@@ -94,6 +94,26 @@ export const BibManager: React.FC<BibManagerProps> = ({
     };
   }, [hasUnsavedChanges, debouncedSave]);
 
+  // Handle Escape key to close bibliography manager
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        onClose();
+        return false;
+      }
+    };
+
+    if (isOpen) {
+      // Add event listener with capture = true to handle before other listeners
+      document.addEventListener('keydown', handleKeyDown, { capture: true });
+    }
+
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isOpen, onClose]);
+
   const saveEntries = async () => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
