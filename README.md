@@ -5,8 +5,8 @@ A fully offline LaTeX editor inspired by Overleaf, built with Electron, React, a
 ## 📥 Download & Install
 
 ### Quick Downloads
-- **macOS (Apple Silicon)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0-arm64.dmg) (95MB)
-- **macOS (Intel)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.dmg) (101MB)
+- **macOS (Apple Silicon)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0-arm64.dmg) (269MB)
+- **macOS (Intel)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.dmg) (274MB)
 - **Linux**: [Download AppImage](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.AppImage) (104MB)
 
 ### Installation Instructions
