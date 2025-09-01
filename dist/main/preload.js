@@ -63,6 +63,10 @@ const electronAPI = {
     bibTexWrite: (payload) => electron_1.ipcRenderer.invoke('BibTeX.Write', payload),
     bibTexCreateEntry: (payload) => electron_1.ipcRenderer.invoke('BibTeX.CreateEntry', payload),
     bibTexGetEntryTypes: () => electron_1.ipcRenderer.invoke('BibTeX.GetEntryTypes'),
+    // First Run APIs
+    firstRunPerformCheck: () => electron_1.ipcRenderer.invoke('FirstRun.PerformCheck'),
+    firstRunIsFirstRun: () => electron_1.ipcRenderer.invoke('FirstRun.IsFirstRun'),
+    firstRunWriteDefaultSettings: () => electron_1.ipcRenderer.invoke('FirstRun.WriteDefaultSettings'),
     // Event listeners
     onCompileProgress: (callback) => electron_1.ipcRenderer.on('Compile.Progress', callback),
     removeCompileProgressListener: (callback) => electron_1.ipcRenderer.removeListener('Compile.Progress', callback),

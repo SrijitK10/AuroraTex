@@ -209,6 +209,13 @@ export interface ElectronAPI {
         type: string;
     }) => Promise<any>;
     bibTexGetEntryTypes: () => Promise<any[]>;
+    firstRunPerformCheck: () => Promise<any>;
+    firstRunIsFirstRun: () => Promise<{
+        isFirstRun: boolean;
+    }>;
+    firstRunWriteDefaultSettings: () => Promise<{
+        ok: boolean;
+    }>;
     onCompileProgress: (callback: (event: any, data: any) => void) => void;
     removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
     onFileChanged: (callback: (event: any, data: any) => void) => void;

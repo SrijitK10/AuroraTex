@@ -12,11 +12,13 @@ const SnapshotService_1 = require("./services/SnapshotService");
 const TemplateService_1 = require("./services/TemplateService");
 const SnippetService_1 = require("./services/SnippetService");
 const BibTeXService_1 = require("./services/BibTeXService");
+const FirstRunService_1 = require("./services/FirstRunService");
 class App {
     constructor() {
         this.mainWindow = null;
         this.projectService = new ProjectService_1.ProjectService();
         this.settingsService = new SettingsService_1.SettingsService();
+        this.firstRunService = new FirstRunService_1.FirstRunService(this.settingsService);
         this.compileOrchestrator = new CompileOrchestrator_1.CompileOrchestrator();
         this.autoCompileService = new AutoCompileService_1.AutoCompileService(this.compileOrchestrator, this.settingsService);
         this.fileService = new FileService_1.FileService(this.autoCompileService);
@@ -32,6 +34,20 @@ class App {
         await this.settingsService.initialize();
         await this.templateService.initialize();
         await this.snippetService.initialize();
+        // Perform first-run check and setup
+        console.log('[App] Performing first-run check...');
+        const firstRunResult = await this.firstRunService.performFirstRunCheck();
+        if (firstRunResult.isFirstRun) {
+            console.log('[App] First run detected - setting up defaults...');
+            await this.firstRunService.writeDefaultSettings();
+            // Log first-run results for debugging
+            console.log('[App] First-run check results:', {
+                checks: firstRunResult.checks,
+                texDistributions: firstRunResult.texDistributions.length,
+                errors: firstRunResult.errors.length,
+                recommendations: firstRunResult.recommendations.length
+            });
+        }
         this.createWindow();
         this.setupIPC();
         this.setupProtocolHandlers();
@@ -328,6 +344,17 @@ class App {
         });
         electron_1.ipcMain.handle('FS.StopWatching', async (_, payload) => {
             await this.fileService.stopWatching(payload.projectId);
+            return { ok: true };
+        });
+        // First-run and installation check handlers
+        electron_1.ipcMain.handle('FirstRun.PerformCheck', async () => {
+            return await this.firstRunService.performFirstRunCheck();
+        });
+        electron_1.ipcMain.handle('FirstRun.IsFirstRun', async () => {
+            return { isFirstRun: this.firstRunService.isFirstRun() };
+        });
+        electron_1.ipcMain.handle('FirstRun.WriteDefaultSettings', async () => {
+            await this.firstRunService.writeDefaultSettings();
             return { ok: true };
         });
     }

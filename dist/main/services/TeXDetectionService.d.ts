@@ -37,6 +37,7 @@ export declare class TeXDetectionService {
     detectBundledDistribution(): Promise<TeXDistribution | null>;
     detectSystemDistribution(): Promise<TeXDistribution | null>;
     private findInPath;
+    private findInCommonPaths;
     validateBinaryPath(path: string, binaryName: string): Promise<boolean>;
     private validateBinaryAtPath;
     private extractVersion;
