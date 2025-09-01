@@ -1,21 +1,20 @@
-# Offline Overleaf - LaTeX Editor
+# AuroraTex - Offline LaTeX Editor
 
 A fully offline LaTeX editor inspired by Overleaf, built with Electron, React, and Node.js. This application provides a complete LaTeX editing environment that works entirely offline.
 
 ## 📥 Download & Install
 
 ### Quick Downloads
-- **macOS (Apple Silicon)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/Offline%20Overleaf-1.0.0-arm64.dmg) (93MB)
-- **macOS (Intel)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/Offline%20Overleaf-1.0.0.dmg) (98MB)  
-- **Linux**: [Download AppImage](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/Offline%20Overleaf-1.0.0.AppImage) (102MB)
-- **Windows**: [Download ZIP](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/Offline-Overleaf-1.0.0-Windows-x64.zip)
+- **macOS (Apple Silicon)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0-arm64.dmg) (95MB)
+- **macOS (Intel)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.dmg) (101MB)
+- **Linux**: [Download AppImage](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.AppImage) (104MB)
 
 ### Installation Instructions
 
 #### macOS
 1. Download the DMG file for your Mac (Apple Silicon or Intel)
 2. Double-click to open the disk image
-3. Drag "Offline Overleaf" to Applications folder
+3. Drag "AuroraTex" to Applications folder
 4. Launch from Applications or Spotlight search
 5. **First time**: Right-click app → "Open" → "Open" (for Gatekeeper)
 
@@ -26,7 +25,7 @@ A fully offline LaTeX editor inspired by Overleaf, built with Electron, React, a
 
 #### Windows
 1. Download and extract the ZIP file
-2. Run `Offline Overleaf.exe` from extracted folder
+2. Run `AuroraTex.exe` from extracted folder
 3. Pin to taskbar or create shortcut as needed
 
 > **📋 TeX Requirement**: Install [TeX Live](https://tug.org/texlive/) for LaTeX compilation, or the app will guide you through setup on first run.
