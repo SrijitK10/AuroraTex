@@ -77,7 +77,16 @@ export interface ElectronAPI {
   firstRunIsFirstRun: () => Promise<{ isFirstRun: boolean }>;
   firstRunWriteDefaultSettings: () => Promise<{ ok: boolean }>;
 
+  // TeX Live Installation APIs
+  checkTexInstallReadiness: () => Promise<any>;
+  shouldOfferTexInstall: () => Promise<{ shouldOffer: boolean }>;
+  installTexLive: () => Promise<{ ok: boolean }>;
+  cancelTexInstall: () => Promise<{ ok: boolean }>;
+  getTexInstallStatus: () => Promise<any>;
+
   // Event listeners
+  on: (channel: string, callback: (...args: any[]) => void) => void;
+  removeListener: (channel: string, callback: (...args: any[]) => void) => void;
   onCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
   onFileChanged: (callback: (event: any, data: any) => void) => void;
@@ -177,6 +186,17 @@ const electronAPI: ElectronAPI = {
   // Auto-compile event listeners
   onAutoCompileProgress: (callback) => ipcRenderer.on('AutoCompile.Progress', callback),
   removeAutoCompileProgressListener: (callback) => ipcRenderer.removeListener('AutoCompile.Progress', callback),
+
+  // TeX Live Installation APIs
+  checkTexInstallReadiness: () => ipcRenderer.invoke('texlive:check-readiness'),
+  shouldOfferTexInstall: () => ipcRenderer.invoke('texlive:should-offer-install'),
+  installTexLive: () => ipcRenderer.invoke('texlive:install'),
+  cancelTexInstall: () => ipcRenderer.invoke('texlive:cancel-install'),
+  getTexInstallStatus: () => ipcRenderer.invoke('texlive:get-status'),
+
+  // Generic event listeners
+  on: (channel, callback) => ipcRenderer.on(channel, callback),
+  removeListener: (channel, callback) => ipcRenderer.removeListener(channel, callback),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

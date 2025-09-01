@@ -16,6 +16,7 @@ import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
 import SettingsModal from './components/SettingsModal';
 import { ImageOverlay } from './components/ImageOverlay';
+import { TexLiveInstallation } from './components/TexLiveInstallation';
 
 export interface Project {
   id: string;
@@ -70,6 +71,7 @@ function App() {
   const [isAutoCompileEnabled, setIsAutoCompileEnabled] = useState(false);
   const [autoCompileDelay, setAutoCompileDelay] = useState(750); // Default 750ms
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showTexInstallModal, setShowTexInstallModal] = useState(false);
 
   // Milestone 6: Error parsing and source mapping state
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -897,7 +899,28 @@ function App() {
 
     loadAutoCompileDelay();
     loadAutoCompileEnabled();
+
+    // Check if we should offer TeX Live installation
+    checkTexLiveInstallation();
   }, []);
+
+  // Check if TeX Live installation should be offered
+  const checkTexLiveInstallation = async () => {
+    try {
+      // Only check this once when the app starts
+      if (window.electronAPI.shouldOfferTexInstall) {
+        const result = await window.electronAPI.shouldOfferTexInstall();
+        if (result.shouldOffer) {
+          // Delay showing the modal to avoid conflicts with other startup modals
+          setTimeout(() => {
+            setShowTexInstallModal(true);
+          }, 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check TeX Live installation status:', error);
+    }
+  };
 
   const activeTab = openTabs.find(tab => tab.id === activeTabId);
 
@@ -1185,6 +1208,19 @@ function App() {
         onToggleAutoCompile={handleToggleAutoCompile}
         autoCompileDelay={autoCompileDelay}
         onAutoCompileDelayChange={handleAutoCompileDelayChange}
+      />
+
+      {/* TeX Live Installation Modal */}
+      <TexLiveInstallation
+        show={showTexInstallModal}
+        onClose={() => setShowTexInstallModal(false)}
+        onInstallComplete={() => {
+          setShowTexInstallModal(false);
+          // Refresh settings to detect the new TeX installation
+          if (showSettingsModal) {
+            window.location.reload();
+          }
+        }}
       />
 
       {/* Milestone 8: Bibliography Manager */}

@@ -1,12 +1,14 @@
 import { spawn } from 'child_process';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { app } from 'electron';
+import { TeXLiveInstaller } from './TeXLiveInstaller';
 
 export interface TeXBinary {
   path: string | null;
   version: string | null;
   isValid: boolean;
-  source: 'bundled' | 'system' | 'custom';
+  source: 'bundled' | 'system' | 'custom' | 'auroratex-installed';
 }
 
 export interface TeXDistribution {
@@ -40,10 +42,12 @@ export interface TeXSettings {
 
 export class TeXDetectionService {
   private bundledPath: string;
+  private texLiveInstaller: TeXLiveInstaller;
 
   constructor() {
     // Path to bundled TeX distribution (if included)
     this.bundledPath = join(process.resourcesPath || '', 'texlive', 'bin');
+    this.texLiveInstaller = new TeXLiveInstaller();
   }
 
   async detectAllDistributions(): Promise<TeXDistribution[]> {
@@ -51,19 +55,166 @@ export class TeXDetectionService {
     
     const distributions: TeXDistribution[] = [];
     
-    // 1. Try bundled distribution
+    // 1. Try AuroraTex-installed TeX Live
+    const auroraTexInstalled = await this.detectAuroraTexInstalledDistribution();
+    if (auroraTexInstalled) {
+      distributions.push(auroraTexInstalled);
+    }
+    
+    // 2. Try bundled distribution
     const bundled = await this.detectBundledDistribution();
     if (bundled) {
       distributions.push(bundled);
     }
     
-    // 2. Try system distributions
+    // 3. Try system distributions
     const system = await this.detectSystemDistribution();
     if (system) {
       distributions.push(system);
     }
     
     return distributions;
+  }
+
+  async detectAuroraTexInstalledDistribution(): Promise<TeXDistribution | null> {
+    console.log('[TeXDetectionService] Checking for AuroraTex-installed TeX distribution...');
+    
+    // Check if TeX Live was installed by AuroraTex
+    if (!await this.texLiveInstaller.isTexLiveInstalled()) {
+      console.log('[TeXDetectionService] AuroraTex-installed TeX Live not found');
+      return null;
+    }
+
+    const binPath = this.texLiveInstaller.getTexLiveBinPath();
+    console.log(`[TeXDetectionService] Checking AuroraTex TeX binaries at: ${binPath}`);
+
+    const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+    const detectedBinaries: Record<string, TeXBinary> = {};
+    let validCount = 0;
+
+    for (const binary of binaries) {
+      const binaryPath = join(binPath, process.platform === 'win32' ? `${binary}.exe` : binary);
+      const detected = await this.validateBinaryAtPath(binaryPath, binary);
+      
+      if (detected) {
+        detectedBinaries[binary] = {
+          ...detected,
+          source: 'auroratex-installed'
+        };
+        if (detected.isValid) validCount++;
+      } else {
+        detectedBinaries[binary] = {
+          path: null,
+          version: null,
+          isValid: false,
+          source: 'auroratex-installed'
+        };
+      }
+    }
+
+    const isValid = validCount >= 3; // Need at least 3 essential binaries
+    const installStatus = this.texLiveInstaller.getInstallationStatus();
+
+    if (isValid) {
+      console.log(`[TeXDetectionService] Found valid AuroraTex TeX Live installation with ${validCount} binaries`);
+    }
+
+    return {
+      name: `AuroraTex TeX Live ${installStatus.version || '2025'}`,
+      isBundled: false,
+      isValid,
+      isActive: false, // Will be set by SettingsService
+      latexmk: detectedBinaries.latexmk,
+      pdflatex: detectedBinaries.pdflatex,
+      xelatex: detectedBinaries.xelatex,
+      lualatex: detectedBinaries.lualatex,
+      biber: detectedBinaries.biber,
+      bibtex: detectedBinaries.bibtex,
+    };
+  }
+
+  /**
+   * Check if we should offer automatic TeX Live installation
+   */
+  async shouldOfferAutoInstall(): Promise<boolean> {
+    const distributions = await this.detectAllDistributions();
+    const hasValidDistribution = distributions.some(dist => dist.isValid);
+    
+    // Only offer if no valid TeX distribution is found
+    return !hasValidDistribution;
+  }
+
+  /**
+   * Get the TeX Live installer instance for automatic installation
+   */
+  getTexLiveInstaller(): TeXLiveInstaller {
+    return this.texLiveInstaller;
+  }
+
+  /**
+   * Check system readiness for TeX Live installation
+   */
+  async checkInstallationReadiness(): Promise<{
+    canInstall: boolean;
+    platform: string;
+    architecture: string;
+    estimatedSize: number;
+    issues: string[];
+  }> {
+    const issues: string[] = [];
+    
+    // Check platform support
+    const supportedPlatforms = ['darwin', 'win32', 'linux'];
+    if (!supportedPlatforms.includes(process.platform)) {
+      issues.push(`Platform ${process.platform} not supported for automatic installation`);
+    }
+
+    // Check for required tools on Unix systems
+    if (process.platform !== 'win32') {
+      const hasPerl = await this.checkCommand('perl', ['--version']);
+      if (!hasPerl) {
+        issues.push('Perl is required for TeX Live installation but not found');
+      }
+
+      const hasTar = await this.checkCommand('tar', ['--version']);
+      if (!hasTar) {
+        issues.push('tar is required for extraction but not found');
+      }
+    }
+
+    // Check available disk space (simplified)
+    const estimatedSize = process.platform === 'win32' ? 4800 : 4500; // MB
+
+    return {
+      canInstall: issues.length === 0,
+      platform: process.platform,
+      architecture: process.arch,
+      estimatedSize,
+      issues
+    };
+  }
+
+  /**
+   * Check if a command is available
+   */
+  private async checkCommand(command: string, args: string[]): Promise<boolean> {
+    return new Promise((resolve) => {
+      const process = spawn(command, args, { stdio: 'ignore' });
+      
+      process.on('close', (code) => {
+        resolve(code === 0);
+      });
+
+      process.on('error', () => {
+        resolve(false);
+      });
+
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        process.kill();
+        resolve(false);
+      }, 5000);
+    });
   }
 
   async detectBundledDistribution(): Promise<TeXDistribution | null> {
