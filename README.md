@@ -1,47 +1,60 @@
-# AuroraTex - Offline LaTeX Editor
+# AuroraTex - Professional Offline LaTeX Editor
 
-A fully offline LaTeX editor inspired by Overleaf, built with Electron, React, and Node.js. This application provides a complete LaTeX editing environment that works entirely offline.
+![Downloads](https://img.shields.io/github/downloads/SrijitK10/Overleaf-offline/total)
+![Latest Release](https://img.shields.io/github/v/release/SrijitK10/Overleaf-offline)
+![License](https://img.shields.io/github/license/SrijitK10/Overleaf-offline)
+
+A fully offline LaTeX editor inspired by Overleaf, built with Electron, React, and Node.js. AuroraTex provides a complete LaTeX editing environment that works entirely offline with no internet connection required.
+
+> **✨ Fully Rebranded**: Formerly "Offline Overleaf", now proudly **AuroraTex** with professional branding and enhanced user experience.
 
 ## 📥 Download & Install
 
-### Quick Downloads
-- **macOS (Apple Silicon)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0-arm64.dmg) (269MB)
-- **macOS (Intel)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.dmg) (274MB)
+### 🚀 Quick Downloads
+- **macOS (Apple Silicon)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0-arm64.dmg) (96MB)
+- **macOS (Intel)**: [Download DMG](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.dmg) (101MB)
 - **Linux**: [Download AppImage](https://github.com/SrijitK10/Overleaf-offline/releases/latest/download/AuroraTex-1.0.0.AppImage) (104MB)
 
-### Installation Instructions
+### 💻 Installation Instructions
 
 #### macOS
 1. Download the DMG file for your Mac (Apple Silicon or Intel)
 2. Double-click to open the disk image
-3. Drag "AuroraTex" to Applications folder
+3. Drag **"AuroraTex"** to Applications folder
 4. Launch from Applications or Spotlight search
-5. **First time**: Right-click app → "Open" → "Open" (for Gatekeeper)
+5. **First time**: Right-click app → "Open" → "Open" (bypasses Gatekeeper)
 
 #### Linux  
 1. Download the AppImage file
-2. Make executable: `chmod +x Offline\ Overleaf-1.0.0.AppImage`
-3. Run: `./Offline\ Overleaf-1.0.0.AppImage`
+2. Make executable: `chmod +x AuroraTex-1.0.0.AppImage`
+3. Run: `./AuroraTex-1.0.0.AppImage`
 
 #### Windows
-1. Download and extract the ZIP file
+1. Download and extract the ZIP file (when available)
 2. Run `AuroraTex.exe` from extracted folder
 3. Pin to taskbar or create shortcut as needed
 
-> **📋 TeX Requirement**: Install [TeX Live](https://tug.org/texlive/) for LaTeX compilation, or the app will guide you through setup on first run.
+> **📋 TeX Requirement**: AuroraTex includes 4 sample templates. For full compilation, install [TeX Live](https://tug.org/texlive/) or the app will guide you through setup on first run with automatic TeX detection.
 
-## Features
+## ✨ Features
 
-- **Project Management**: Create, open, and manage LaTeX projects
-- **File Tree**: Navigate and organize project files with an intuitive sidebar
-- **Code Editor**: Advanced LaTeX editing with CodeMirror 6
-- **Real-time PDF Preview**: Instant PDF compilation and preview
-- **Compilation System**: Integrated LaTeX compilation with detailed logs
-- **Error Handling**: Parse and display LaTeX errors with source mapping
-- **File Operations**: Create, rename, delete files and folders
-- **Autosave**: Automatic saving of changes
-- **History & Snapshots**: Project version control and history
-- **Fully Offline**: No internet connection required
+### Core Functionality
+- **🔧 Project Management**: Create, open, and manage LaTeX projects with ease
+- **📁 Smart File Tree**: Intuitive sidebar navigation and file organization
+- **✏️ Advanced Editor**: CodeMirror 6 powered LaTeX editing with syntax highlighting
+- **📄 Real-time PDF Preview**: Instant compilation and preview with PDF.js
+- **🔨 Robust Compilation**: Integrated LaTeX compilation with detailed logs and error handling
+- **🎯 Error Navigation**: Click errors to jump directly to source location
+- **💾 Auto-save**: Automatic saving of all changes
+- **📚 Sample Templates**: Includes 4 built-in LaTeX templates (article, thesis, presentation, minimal)
+
+### Professional Features
+- **🛡️ First-Run Setup**: Comprehensive system check and automatic TeX detection
+- **🔍 TeX Live Support**: Auto-detects TeX Live 2025 and other distributions
+- **⚡ Background Compilation**: Non-blocking compilation with progress tracking
+- **📊 System Status**: Real-time status monitoring and health checks
+- **🔒 Secure Sandbox**: All operations sandboxed for security
+- **🌐 Fully Offline**: Zero internet dependency after installation
 
 ## Architecture
 
