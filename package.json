@@ -3,6 +3,10 @@
   "version": "1.1.0",
   "description": "AuroraTex - Professional offline LaTeX editor",
   "main": "dist/main/main.js",
+  "author": {
+    "name": "SrijitK10",
+    "email": "srijit@auroratex.dev"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
