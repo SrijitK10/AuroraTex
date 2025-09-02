@@ -350,6 +350,53 @@ export class CompileOrchestrator extends EventEmitter {
     }
   }
 
+  // Helper method for robust file copying with retries and validation
+  private async robustFileCopy(sourcePath: string, destPath: string, fileType: string, maxRetries = 3): Promise<void> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Wait a bit between attempts to handle filesystem timing issues
+        if (attempt > 1) {
+          await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+        }
+        
+        // Verify source file exists and has content
+        const sourceStats = await stat(sourcePath);
+        if (sourceStats.size === 0) {
+          throw new Error(`Source ${fileType} file is empty`);
+        }
+        
+        // Perform the copy
+        await copyFile(sourcePath, destPath);
+        
+        // Verify the copy was successful
+        const destStats = await stat(destPath);
+        if (destStats.size !== sourceStats.size) {
+          throw new Error(`${fileType} copy size mismatch: ${destStats.size} vs ${sourceStats.size}`);
+        }
+        
+        console.log(`[CompileOrchestrator] Successfully copied ${fileType} (${sourceStats.size} bytes) on attempt ${attempt}`);
+        return; // Success!
+        
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`[CompileOrchestrator] Copy attempt ${attempt} failed for ${fileType}:`, lastError.message);
+        
+        // Clean up partial copy on failure
+        try {
+          if (existsSync(destPath)) {
+            await rm(destPath);
+          }
+        } catch (cleanupError) {
+          console.warn(`[CompileOrchestrator] Failed to cleanup partial copy:`, cleanupError);
+        }
+      }
+    }
+    
+    throw new Error(`Failed to copy ${fileType} after ${maxRetries} attempts: ${lastError?.message}`);
+  }
+
   private emitQueueStateChange(): void {
     const queueState = this.getQueueState();
     this.emit('queueState', queueState);
@@ -520,25 +567,58 @@ export class CompileOrchestrator extends EventEmitter {
       console.log(`[CompileOrchestrator] Main file: ${project.mainFile}`);
       await this.runSecureLatexmk(job, latexmkPath, buildDir, project.mainFile, engine, project.settings.shellEscape);
 
-      // Milestone 5: Copy output back to project (only main.pdf + compile.log)
+      // Enhanced PDF copy with reliability improvements
       const outputDir = join(project.root, 'output');
       await mkdir(outputDir, { recursive: true });
       
       // Always copy compile.log (Milestone 4: keep compile.log on error)
       const logPath = join(buildDir, project.mainFile.replace('.tex', '.log'));
       if (existsSync(logPath)) {
-        await copyFile(logPath, join(outputDir, 'compile.log'));
+        await this.robustFileCopy(logPath, join(outputDir, 'compile.log'), 'compile.log');
       }
       
       const pdfPath = join(buildDir, project.mainFile.replace('.tex', '.pdf'));
       if (existsSync(pdfPath)) {
-        await copyFile(pdfPath, join(outputDir, 'main.pdf'));
-        job.state = 'success';
-        this.emitProgress(job.id, { 
-          state: 'success', 
-          percent: 100, 
-          message: 'Compilation completed successfully!' 
-        });
+        // Validate PDF exists and has content before copying
+        const pdfStats = await stat(pdfPath);
+        if (pdfStats.size > 1024) { // PDF should be at least 1KB
+          await this.robustFileCopy(pdfPath, join(outputDir, 'main.pdf'), 'main.pdf');
+          
+          // Final verification that PDF was copied successfully
+          const destPdfPath = join(outputDir, 'main.pdf');
+          if (existsSync(destPdfPath)) {
+            const destStats = await stat(destPdfPath);
+            if (destStats.size === pdfStats.size) {
+              job.state = 'success';
+              this.emitProgress(job.id, { 
+                state: 'success', 
+                percent: 100, 
+                message: 'Compilation completed successfully!' 
+              });
+            } else {
+              job.state = 'error';
+              job.logs.push('ERROR: PDF copy verification failed - size mismatch');
+              this.emitProgress(job.id, { 
+                state: 'error', 
+                message: 'PDF copy verification failed' 
+              });
+            }
+          } else {
+            job.state = 'error';
+            job.logs.push('ERROR: PDF copy failed - destination file not found');
+            this.emitProgress(job.id, { 
+              state: 'error', 
+              message: 'PDF copy failed' 
+            });
+          }
+        } else {
+          job.state = 'error';
+          job.logs.push('ERROR: PDF file is too small (possibly corrupted)');
+          this.emitProgress(job.id, { 
+            state: 'error', 
+            message: 'PDF file is too small or corrupted' 
+          });
+        }
       } else {
         job.state = 'error';
         job.logs.push('ERROR: PDF file not generated');

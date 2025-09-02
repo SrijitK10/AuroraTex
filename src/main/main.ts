@@ -41,32 +41,94 @@ class App {
   async initialize() {
     await app.whenReady();
     
-    // Initialize services
-    await this.projectService.initialize();
-    await this.settingsService.initialize();
-    await this.templateService.initialize();
-    await this.snippetService.initialize();
+    // Create window first for faster perceived startup
+    this.createWindow();
+    this.setupProtocolHandlers();
     
-    // Perform first-run check and setup
-    console.log('[App] Performing first-run check...');
-    const firstRunResult = await this.firstRunService.performFirstRunCheck();
+    // Show loading state immediately
+    if (this.mainWindow) {
+      this.mainWindow.webContents.once('did-finish-load', () => {
+        this.mainWindow!.webContents.send('app-initializing', { stage: 'services' });
+      });
+    }
     
-    if (firstRunResult.isFirstRun) {
-      console.log('[App] First run detected - setting up defaults...');
+    // Initialize services in background
+    this.initializeServicesAsync();
+    this.setupIPC();
+  }
+
+  private async initializeServicesAsync() {
+    try {
+      // Initialize core services first (fast)
+      await this.projectService.initialize();
+      
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('app-initializing', { stage: 'settings' });
+      }
+      
+      // Initialize settings (potentially slow due to TeX detection)
+      await this.settingsService.initialize();
+      
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('app-initializing', { stage: 'templates' });
+      }
+      
+      // Initialize other services in parallel
+      await Promise.all([
+        this.templateService.initialize(),
+        this.snippetService.initialize()
+      ]);
+      
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('app-initializing', { stage: 'first-run' });
+      }
+      
+      // Perform first-run check only if needed (can be slow)
+      const isFirstRun = this.firstRunService.isFirstRun();
+      if (isFirstRun) {
+        console.log('[App] First run detected - performing checks in background...');
+        // Run first-run checks in background to not block UI
+        this.performFirstRunChecksAsync();
+      }
+      
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('app-initialized', { 
+          success: true,
+          isFirstRun 
+        });
+      }
+      
+      console.log('[App] Background initialization completed');
+      
+    } catch (error) {
+      console.error('[App] Service initialization failed:', error);
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('app-initialized', { 
+          success: false, 
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+  }
+
+  private async performFirstRunChecksAsync() {
+    try {
+      const firstRunResult = await this.firstRunService.performFirstRunCheck();
       await this.firstRunService.writeDefaultSettings();
       
-      // Log first-run results for debugging
-      console.log('[App] First-run check results:', {
+      console.log('[App] First-run check completed:', {
         checks: firstRunResult.checks,
         texDistributions: firstRunResult.texDistributions.length,
         errors: firstRunResult.errors.length,
         recommendations: firstRunResult.recommendations.length
       });
+      
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('first-run-completed', firstRunResult);
+      }
+    } catch (error) {
+      console.error('[App] First-run check failed:', error);
     }
-    
-    this.createWindow();
-    this.setupIPC();
-    this.setupProtocolHandlers();
   }
 
   async cleanup() {
@@ -82,11 +144,18 @@ class App {
     this.mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
+      show: false, // Don't show until ready
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         preload: join(__dirname, 'preload.js'),
       },
+    });
+
+    // Show window when ready to render
+    this.mainWindow.once('ready-to-show', () => {
+      this.mainWindow!.show();
+      this.mainWindow!.focus();
     });
 
     if (process.env.NODE_ENV === 'development') {
@@ -427,7 +496,7 @@ class App {
       return { ok: true };
     });
 
-    // First-run and installation check handlers
+    // FirstRun service handlers
     ipcMain.handle('FirstRun.PerformCheck', async () => {
       return await this.firstRunService.performFirstRunCheck();
     });
@@ -439,6 +508,19 @@ class App {
     ipcMain.handle('FirstRun.WriteDefaultSettings', async () => {
       await this.firstRunService.writeDefaultSettings();
       return { ok: true };
+    });
+
+    // App initialization status
+    ipcMain.handle('App.GetInitializationStatus', async () => {
+      return { 
+        initialized: true, // Will be updated based on actual state
+        services: {
+          projectService: !!this.projectService,
+          settingsService: !!this.settingsService,
+          templateService: !!this.templateService,
+          snippetService: !!this.snippetService
+        }
+      };
     });
   }
 }
