@@ -11,8 +11,6 @@ import { TemplateService } from './services/TemplateService';
 import { SnippetService } from './services/SnippetService';
 import { BibTeXService } from './services/BibTeXService';
 import { FirstRunService } from './services/FirstRunService';
-import { TeXDetectionService } from './services/TeXDetectionService';
-import { TeXLiveInstaller } from './services/TeXLiveInstaller';
 
 class App {
   private mainWindow: BrowserWindow | null = null;
@@ -26,8 +24,6 @@ class App {
   private snippetService: SnippetService;
   private bibTexService: BibTeXService;
   private firstRunService: FirstRunService;
-  private texDetectionService: TeXDetectionService;
-  private texLiveInstaller: TeXLiveInstaller;
 
   constructor() {
     this.projectService = new ProjectService();
@@ -40,8 +36,6 @@ class App {
     this.templateService = new TemplateService();
     this.snippetService = new SnippetService();
     this.bibTexService = new BibTeXService();
-    this.texDetectionService = new TeXDetectionService();
-    this.texLiveInstaller = this.texDetectionService.getTexLiveInstaller();
   }
 
   async initialize() {
@@ -445,47 +439,6 @@ class App {
     ipcMain.handle('FirstRun.WriteDefaultSettings', async () => {
       await this.firstRunService.writeDefaultSettings();
       return { ok: true };
-    });
-
-    // TeX Live Installation APIs
-    ipcMain.handle('texlive:check-readiness', async () => {
-      return await this.texDetectionService.checkInstallationReadiness();
-    });
-
-    ipcMain.handle('texlive:should-offer-install', async () => {
-      const shouldOffer = await this.texDetectionService.shouldOfferAutoInstall();
-      return { shouldOffer };
-    });
-
-    ipcMain.handle('texlive:install', async () => {
-      try {
-        // Set up progress event forwarding
-        this.texLiveInstaller.on('progress', (progress) => {
-          if (this.mainWindow) {
-            this.mainWindow.webContents.send('tex-install-progress', progress);
-          }
-        });
-
-        const result = await this.texLiveInstaller.installTexLive();
-        return { ok: result };
-      } catch (error) {
-        console.error('TeX Live installation failed:', error);
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
-      }
-    });
-
-    ipcMain.handle('texlive:cancel-install', async () => {
-      try {
-        await this.texLiveInstaller.cancelInstallation();
-        return { ok: true };
-      } catch (error) {
-        console.error('Failed to cancel TeX Live installation:', error);
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
-      }
-    });
-
-    ipcMain.handle('texlive:get-status', async () => {
-      return this.texLiveInstaller.getInstallationStatus();
     });
   }
 }

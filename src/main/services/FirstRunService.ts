@@ -10,13 +10,10 @@ export interface FirstRunCheckResult {
     appDataDirectory: boolean;
     bundledTeX: boolean;
     systemTeX: boolean;
-    auroraTexInstalled: boolean;
     sampleTemplates: boolean;
     writePermissions: boolean;
   };
   texDistributions: any[];
-  autoInstallAvailable: boolean;
-  autoInstallRecommended: boolean;
   errors: string[];
   recommendations: string[];
 }
@@ -42,35 +39,32 @@ export class FirstRunService {
         appDataDirectory: false,
         bundledTeX: false,
         systemTeX: false,
-        auroraTexInstalled: false,
         sampleTemplates: false,
         writePermissions: false
       },
       texDistributions: [],
-      autoInstallAvailable: false,
-      autoInstallRecommended: false,
       errors: [],
       recommendations: []
     };
 
     try {
-            // 3. Check for bundled TeX distribution  
+      // 1. Check app data directory
+      result.checks.appDataDirectory = await this.checkAppDataDirectory();
+      
+      // 2. Check for bundled TeX
       result.checks.bundledTeX = await this.checkBundledTeX();
       
-      // 4. Check for system TeX distribution
+      // 3. Check for system TeX
       result.checks.systemTeX = await this.checkSystemTeX();
       
-      // 5. Check for AuroraTex-installed TeX
-      result.checks.auroraTexInstalled = await this.checkAuroraTexInstalledTeX();
+      // 4. Detect all TeX distributions
+      result.texDistributions = await this.texDetectionService.detectAllDistributions();
       
-      // 6. Check sample templates
+      // 5. Check sample templates
       result.checks.sampleTemplates = await this.checkSampleTemplates();
       
-      // 7. Check write permissions
+      // 6. Check write permissions
       result.checks.writePermissions = await this.checkWritePermissions();
-      
-      // 8. Check if automatic TeX installation is available and recommended
-      await this.checkAutoInstallAvailability(result);
       
       // Generate recommendations
       this.generateRecommendations(result);
@@ -118,37 +112,6 @@ export class FirstRunService {
     }
   }
 
-  private async checkAuroraTexInstalledTeX(): Promise<boolean> {
-    try {
-      const auroraTexDistribution = await this.texDetectionService.detectAuroraTexInstalledDistribution();
-      return auroraTexDistribution?.isValid || false;
-    } catch (error) {
-      console.error('[FirstRunService] AuroraTex-installed TeX check failed:', error);
-      return false;
-    }
-  }
-
-  private async checkAutoInstallAvailability(result: FirstRunCheckResult): Promise<void> {
-    try {
-      // Check if we should offer automatic TeX installation
-      const shouldOffer = await this.texDetectionService.shouldOfferAutoInstall();
-      const readiness = await this.texDetectionService.checkInstallationReadiness();
-      
-      result.autoInstallAvailable = readiness.canInstall;
-      result.autoInstallRecommended = shouldOffer && readiness.canInstall;
-      
-      if (result.autoInstallRecommended) {
-        result.recommendations.push('No TeX distribution found. AuroraTex can automatically install TeX Live for you.');
-      } else if (shouldOffer && !readiness.canInstall) {
-        result.recommendations.push(`Automatic TeX Live installation not available: ${readiness.issues.join(', ')}`);
-      }
-    } catch (error) {
-      console.error('[FirstRunService] Auto-install availability check failed:', error);
-      result.autoInstallAvailable = false;
-      result.autoInstallRecommended = false;
-    }
-  }
-
   private async checkSampleTemplates(): Promise<boolean> {
     try {
       const templatesPath = join(process.resourcesPath || '', 'templates');
@@ -187,19 +150,13 @@ export class FirstRunService {
       result.recommendations.push('Grant write permissions to the application data folder');
     }
 
-    if (!checks.bundledTeX && !checks.systemTeX && !checks.auroraTexInstalled) {
+    if (!checks.bundledTeX && !checks.systemTeX) {
       result.errors.push('No TeX distribution found');
-      
-      // Only recommend manual installation if auto-install is not available
-      if (!result.autoInstallRecommended) {
-        result.recommendations.push('Install TeX Live, MiKTeX, or use the bundled TeX distribution if available');
-      }
-    } else if (!checks.bundledTeX && !checks.auroraTexInstalled && checks.systemTeX) {
+      result.recommendations.push('Install TeX Live, MiKTeX, or use the bundled TeX distribution if available');
+    } else if (!checks.bundledTeX && checks.systemTeX) {
       result.recommendations.push('Using system TeX installation - ensure all required packages are installed');
     } else if (checks.bundledTeX) {
       result.recommendations.push('Using bundled TeX distribution - no additional setup required');
-    } else if (checks.auroraTexInstalled) {
-      result.recommendations.push('Using AuroraTex-installed TeX Live - automatically configured');
     }
 
     if (!checks.sampleTemplates) {
