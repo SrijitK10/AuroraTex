@@ -16,6 +16,7 @@ import { ResizableSplitter } from './components/ResizableSplitter';
 import { CollapsibleSidebar } from './components/CollapsibleSidebar';
 import SettingsModal from './components/SettingsModal';
 import { ImageOverlay } from './components/ImageOverlay';
+import { SourceControl } from './components/SourceControl';
 
 export interface Project {
   id: string;
@@ -123,6 +124,9 @@ function App() {
     fileName: string;
   } | null>(null);
 
+  // Source Control state
+  const [showSourceControl, setShowSourceControl] = useState(false);
+
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
 
@@ -132,6 +136,11 @@ function App() {
     const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp', '.ico', '.tiff', '.tif'];
     return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
   };
+
+  // Expose current project globally for Source Control
+  useEffect(() => {
+    (window as any).currentProject = currentProject;
+  }, [currentProject]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -1031,6 +1040,8 @@ function App() {
           errorCount={errors.length}
           showHistoryPanel={showHistoryPanel}
           onToggleHistoryPanel={() => setShowHistoryPanel(!showHistoryPanel)}
+          showSourceControl={showSourceControl}
+          onToggleSourceControl={() => setShowSourceControl(!showSourceControl)}
           showSidebar={showSidebar}
           onToggleSidebar={() => setShowSidebar(!showSidebar)}
           onQuickFileSearch={() => setShowQuickFileSearch(true)}
@@ -1157,6 +1168,13 @@ function App() {
           loadFileTree();
         }}
       />
+
+      {/* Source Control Panel */}
+      {showSourceControl && currentProject && (
+        <div className="fixed right-0 top-16 bottom-0 w-80 bg-gray-900 shadow-2xl z-40">
+          <SourceControl />
+        </div>
+      )}
 
       {/* Milestone 13: Quick File Search */}
       <QuickFileSearch

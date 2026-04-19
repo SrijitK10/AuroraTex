@@ -79,6 +79,7 @@ export interface ElectronAPI {
   removeCompileProgressListener: (callback: (event: any, data: any) => void) => void;
   onFileChanged: (callback: (event: any, data: any) => void) => void;
   removeFileChangedListener: (callback: (event: any, data: any) => void) => void;
+  invoke: (channel: string, ...args: any[]) => Promise<any>;
 }
 
 declare global {

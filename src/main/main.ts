@@ -11,6 +11,10 @@ import { TemplateService } from './services/TemplateService';
 import { SnippetService } from './services/SnippetService';
 import { BibTeXService } from './services/BibTeXService';
 import { FirstRunService } from './services/FirstRunService';
+import GitService from './services/GitService';
+
+// Lazy load GitHubService to handle ES module
+let GitHubService: any;
 
 class App {
   private mainWindow: BrowserWindow | null = null;
@@ -61,6 +65,12 @@ class App {
     try {
       // Initialize core services first (fast)
       await this.projectService.initialize();
+      
+      // Lazy load GitHubService
+      if (!GitHubService) {
+        const module = await import('./services/GitHubService');
+        GitHubService = module.default;
+      }
       
       if (this.mainWindow) {
         this.mainWindow.webContents.send('app-initializing', { stage: 'settings' });
@@ -138,6 +148,15 @@ class App {
 
   public createMainWindow() {
     this.createWindow();
+  }
+
+  private async getGitHubService() {
+    if (!GitHubService) {
+      const module = await import('./services/GitHubService');
+      GitHubService = module.default;
+    }
+
+    return GitHubService;
   }
 
   private createWindow() {
@@ -521,6 +540,232 @@ class App {
           snippetService: !!this.snippetService
         }
       };
+    });
+
+    // Git service handlers
+    ipcMain.handle('Git.Initialize', async (_, payload) => {
+      const success = await GitService.initialize(payload.projectPath);
+      return { success };
+    });
+
+    ipcMain.handle('Git.InitRepository', async (_, payload) => {
+      await GitService.initRepository(payload.projectPath);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.GetStatus', async () => {
+      const files = await GitService.getStatus();
+      return { files };
+    });
+
+    ipcMain.handle('Git.StageFiles', async (_, payload) => {
+      await GitService.stageFiles(payload.files);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.UnstageFiles', async (_, payload) => {
+      await GitService.unstageFiles(payload.files);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.Commit', async (_, payload) => {
+      const commit = await GitService.commit(payload.message);
+      return { commit };
+    });
+
+    ipcMain.handle('Git.GetLog', async (_, payload) => {
+      const log = await GitService.getLog(payload.maxCount || 50);
+      return { log };
+    });
+
+    ipcMain.handle('Git.GetBranches', async () => {
+      const branches = await GitService.getBranches();
+      return { branches };
+    });
+
+    ipcMain.handle('Git.CreateBranch', async (_, payload) => {
+      await GitService.createBranch(payload.name, payload.checkout);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.CheckoutBranch', async (_, payload) => {
+      await GitService.checkoutBranch(payload.name);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.DeleteBranch', async (_, payload) => {
+      await GitService.deleteBranch(payload.name, payload.force);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.Push', async (_, payload) => {
+      await GitService.push(payload.remote, payload.branch, payload.setUpstream);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.Pull', async (_, payload) => {
+      await GitService.pull(payload.remote, payload.branch);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.Fetch', async (_, payload) => {
+      await GitService.fetch(payload.remote);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.GetRemotes', async () => {
+      const remotes = await GitService.getRemotes();
+      return { remotes };
+    });
+
+    ipcMain.handle('Git.AddRemote', async (_, payload) => {
+      await GitService.addRemote(payload.name, payload.url);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.RemoveRemote', async (_, payload) => {
+      await GitService.removeRemote(payload.name);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.GetDiff', async (_, payload) => {
+      const diff = await GitService.getDiff(payload.filePath);
+      return { diff };
+    });
+
+    ipcMain.handle('Git.DiscardChanges', async (_, payload) => {
+      await GitService.discardChanges(payload.files);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.Clone', async (_, payload) => {
+      await GitService.clone(payload.url, payload.targetPath);
+      return { ok: true };
+    });
+
+    ipcMain.handle('Git.GetCurrentBranch', async () => {
+      const branch = await GitService.getCurrentBranch();
+      return { branch };
+    });
+
+    ipcMain.handle('Git.IsClean', async () => {
+      const clean = await GitService.isClean();
+      return { clean };
+    });
+
+    // GitHub service handlers
+    ipcMain.handle('GitHub.Authenticate', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const user = await github.authenticateWithToken(payload.token);
+      return { user };
+    });
+
+    ipcMain.handle('GitHub.StartBrowserAuth', async () => {
+      const github = await this.getGitHubService();
+      const session = await github.startBrowserAuth();
+      return { session };
+    });
+
+    ipcMain.handle('GitHub.CompleteBrowserAuth', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const user = await github.completeBrowserAuth(
+        payload.deviceCode,
+        payload.interval,
+        payload.expiresAt
+      );
+      return { user };
+    });
+
+    ipcMain.handle('GitHub.SignOut', async () => {
+      const github = await this.getGitHubService();
+      github.signOut();
+      return { ok: true };
+    });
+
+    ipcMain.handle('GitHub.IsAuthenticated', async () => {
+      const github = await this.getGitHubService();
+      const authenticated = github.isAuthenticated();
+      return { authenticated };
+    });
+
+    ipcMain.handle('GitHub.GetCurrentUser', async () => {
+      const github = await this.getGitHubService();
+      const user = await github.getCurrentUser();
+      return { user };
+    });
+
+    ipcMain.handle('GitHub.GetRepositories', async () => {
+      const github = await this.getGitHubService();
+      const repos = await github.getRepositories();
+      return { repos };
+    });
+
+    ipcMain.handle('GitHub.CreateRepository', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const repo = await github.createRepository(
+        payload.name,
+        payload.description,
+        payload.isPrivate
+      );
+      return { repo };
+    });
+
+    ipcMain.handle('GitHub.GetPullRequests', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const prs = await github.getPullRequests(
+        payload.owner,
+        payload.repo,
+        payload.state
+      );
+      return { prs };
+    });
+
+    ipcMain.handle('GitHub.CreatePullRequest', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const pr = await github.createPullRequest(
+        payload.owner,
+        payload.repo,
+        payload.title,
+        payload.head,
+        payload.base,
+        payload.body
+      );
+      return { pr };
+    });
+
+    ipcMain.handle('GitHub.ForkRepository', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const fork = await github.forkRepository(payload.owner, payload.repo);
+      return { fork };
+    });
+
+    ipcMain.handle('GitHub.ParseUrl', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const parsed = github.parseGitHubUrl(payload.url);
+      return { parsed };
+    });
+
+    ipcMain.handle('GitHub.InviteCollaborator', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const invite = await github.inviteCollaborator(
+        payload.owner,
+        payload.repo,
+        payload.username,
+        payload.permission
+      );
+      return { invite };
+    });
+
+    ipcMain.handle('GitHub.GetCollaborators', async (_, payload) => {
+      const github = await this.getGitHubService();
+      const collaborators = await github.getCollaborators(payload.owner, payload.repo);
+      return { collaborators };
+    });
+
+    ipcMain.handle('GitHub.GetCredentials', async () => {
+      const github = await this.getGitHubService();
+      const credentials = github.getCredentials();
+      return { credentials };
     });
   }
 }

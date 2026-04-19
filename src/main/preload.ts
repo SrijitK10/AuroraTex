@@ -88,6 +88,9 @@ export interface ElectronAPI {
   // Auto-compile event listeners
   onAutoCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeAutoCompileProgressListener: (callback: (event: any, data: any) => void) => void;
+  
+  // Generic invoke for dynamic IPC calls (Git/GitHub)
+  invoke: (channel: string, ...args: any[]) => Promise<any>;
 }
 
 // Expose the API to the renderer process
@@ -177,6 +180,9 @@ const electronAPI: ElectronAPI = {
   // Auto-compile event listeners
   onAutoCompileProgress: (callback) => ipcRenderer.on('AutoCompile.Progress', callback),
   removeAutoCompileProgressListener: (callback) => ipcRenderer.removeListener('AutoCompile.Progress', callback),
+  
+  // Generic invoke for Git/GitHub and other dynamic calls
+  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

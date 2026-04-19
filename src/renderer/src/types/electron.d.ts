@@ -64,6 +64,7 @@ export interface ElectronAPI {
   // Auto-compile event listeners
   onAutoCompileProgress: (callback: (event: any, data: any) => void) => void;
   removeAutoCompileProgressListener: (callback: (event: any, data: any) => void) => void;
+  invoke: (channel: string, ...args: any[]) => Promise<any>;
 }
 
 declare global {

@@ -12,6 +12,8 @@ interface ActionSidebarProps {
   errorCount?: number;
   showHistoryPanel?: boolean;
   onToggleHistoryPanel?: () => void;
+  showSourceControl?: boolean;
+  onToggleSourceControl?: () => void;
   
   // Sidebar props
   showSidebar?: boolean;
@@ -32,6 +34,8 @@ export const ActionSidebar: React.FC<ActionSidebarProps> = ({
   errorCount = 0,
   showHistoryPanel = false,
   onToggleHistoryPanel,
+  showSourceControl = false,
+  onToggleSourceControl,
   showSidebar = true,
   onToggleSidebar,
   onQuickFileSearch,
@@ -57,6 +61,26 @@ export const ActionSidebar: React.FC<ActionSidebarProps> = ({
           </svg>
           <div className="absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
             File Explorer
+          </div>
+        </button>
+      )}
+      
+      {/* Source Control */}
+      {onToggleSourceControl && (
+        <button
+          onClick={onToggleSourceControl}
+          className={`p-2 rounded transition-colors group relative ${
+            showSourceControl
+              ? 'bg-blue-600 text-white'
+              : 'hover:bg-gray-100 text-gray-600'
+          }`}
+          title="Source Control"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+          <div className="absolute left-full top-1/2 transform -translate-y-1/2 ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+            Source Control
           </div>
         </button>
       )}
