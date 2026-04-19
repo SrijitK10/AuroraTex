@@ -130,6 +130,11 @@ function App() {
   // Editor ref for direct access to editor functions
   const editorRef = useRef<EditorRef>(null);
 
+  // Guard against repeated external-change dialogs for the same file.
+  // Maps relPath -> timestamp of last handled event; also used to block
+  // concurrent dialogs while window.confirm is still open.
+  const lastExternalChangeHandled = useRef<Map<string, number>>(new Map());
+
   // Helper function to check if file is an image
   const isImageFile = (fileName: string): boolean => {
     if (!fileName) return false;
@@ -257,6 +262,15 @@ function App() {
           const isFileManaged = managedFiles.has(data.path);
           
           if (affectedTab && !affectedTab.isDirty && !isFileManaged) {
+            // Debounce: skip if we already showed a dialog for this file recently
+            // (covers stacked IPC events queued during window.confirm's blocking call
+            // and extra chokidar events fired for the same write).
+            const lastHandled = lastExternalChangeHandled.current.get(data.path) ?? 0;
+            if (Date.now() - lastHandled < 8000) {
+              return;
+            }
+            lastExternalChangeHandled.current.set(data.path, Date.now());
+
             // Only show reload dialog for files that aren't being managed by specialized editors
             const shouldReload = window.confirm(
               `The file "${data.path}" has been modified externally. Would you like to reload it?`

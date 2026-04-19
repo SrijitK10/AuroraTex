@@ -201,14 +201,15 @@ export class FileService {
         /\.swp$/,         // Vim swap files
         /\.swo$/,         // Vim swap files
         /\#.*\#$/,        // Emacs backup files
+        /\.(aux|bbl|blg|fdb_latexmk|fls|synctex\.gz|toc|lof|lot|out|nav|snm|vrb|xdv|run\.xml|bcf)$/, // LaTeX auxiliary files
       ],
       persistent: true,
       ignoreInitial: true,
       depth: 10,
       usePolling: false, // Use native file system events for better performance
       awaitWriteFinish: { // Wait for write operations to complete
-        stabilityThreshold: 100,
-        pollInterval: 10
+        stabilityThreshold: 500,
+        pollInterval: 50
       }
     });
 
