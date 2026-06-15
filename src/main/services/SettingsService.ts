@@ -190,7 +190,7 @@ export class SettingsService {
     const settings = await this.getTexSettings();
     
     const binaries: Record<string, any> = {};
-    const binaryNames = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+    const binaryNames = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex', 'synctex'];
     
     let validCount = 0;
     for (const binary of binaryNames) {
@@ -225,6 +225,7 @@ export class SettingsService {
       lualatex: binaries.lualatex,
       biber: binaries.biber,
       bibtex: binaries.bibtex,
+      synctex: binaries.synctex,
     };
     
     settings.distributions.push(customDistribution);
@@ -252,7 +253,7 @@ export class SettingsService {
     
     const activeDistribution = settings.distributions.find(d => d.isActive);
     if (activeDistribution) {
-      const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+      const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex', 'synctex'];
       for (const binary of binaries) {
         const binaryInfo = activeDistribution[binary as keyof TeXDistribution] as any;
         if (binaryInfo && binaryInfo.path && binaryInfo.isValid) {

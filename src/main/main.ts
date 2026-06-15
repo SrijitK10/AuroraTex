@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, protocol, shell, dialog } from 'electron';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -11,13 +12,16 @@ import { TemplateService } from './services/TemplateService';
 import { SnippetService } from './services/SnippetService';
 import { BibTeXService } from './services/BibTeXService';
 import { FirstRunService } from './services/FirstRunService';
+import { SyncTexService } from './services/SyncTexService';
 import GitService from './services/GitService';
+import GitHubServiceInstance from './services/GitHubService';
 
-// Lazy load GitHubService to handle ES module
-let GitHubService: any;
+// GitHubService is now imported directly (no more lazy loading race)
 
 class App {
   private mainWindow: BrowserWindow | null = null;
+  private rendererRecoveryAttempts = 0;
+  private unresponsiveTimer: NodeJS.Timeout | null = null;
   private fileService: FileService;
   private projectService: ProjectService;
   private settingsService: SettingsService;
@@ -28,6 +32,7 @@ class App {
   private snippetService: SnippetService;
   private bibTexService: BibTeXService;
   private firstRunService: FirstRunService;
+  private syncTexService: SyncTexService;
 
   constructor() {
     this.projectService = new ProjectService();
@@ -40,6 +45,7 @@ class App {
     this.templateService = new TemplateService();
     this.snippetService = new SnippetService();
     this.bibTexService = new BibTeXService();
+    this.syncTexService = new SyncTexService((binaryName: string) => this.settingsService.getTexBinaryPath(binaryName));
   }
 
   async initialize() {
@@ -65,12 +71,6 @@ class App {
     try {
       // Initialize core services first (fast)
       await this.projectService.initialize();
-      
-      // Lazy load GitHubService
-      if (!GitHubService) {
-        const module = await import('./services/GitHubService');
-        GitHubService = module.default;
-      }
       
       if (this.mainWindow) {
         this.mainWindow.webContents.send('app-initializing', { stage: 'settings' });
@@ -150,19 +150,43 @@ class App {
     this.createWindow();
   }
 
-  private async getGitHubService() {
-    if (!GitHubService) {
-      const module = await import('./services/GitHubService');
-      GitHubService = module.default;
+  private loadMainWindowContents() {
+    if (!this.mainWindow) return;
+
+    if (process.env.NODE_ENV === 'development') {
+      this.mainWindow.loadURL('http://localhost:3000');
+      this.mainWindow.webContents.openDevTools();
+    } else {
+      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    }
+  }
+
+  private recoverRenderer(reason: string) {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+
+    if (this.rendererRecoveryAttempts >= 3) {
+      console.error(`[App] Renderer recovery limit reached after: ${reason}`);
+      return;
     }
 
-    return GitHubService;
+    this.rendererRecoveryAttempts += 1;
+    console.warn(`[App] Recovering renderer (${this.rendererRecoveryAttempts}/3) after: ${reason}`);
+
+    setTimeout(() => {
+      if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+      this.mainWindow.webContents.reloadIgnoringCache();
+    }, 400);
   }
+
+  // GitHubService is imported at module level — no lazy loading needed
 
   private createWindow() {
     this.mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
+      minWidth: 960,
+      minHeight: 640,
+      backgroundColor: '#f3f4f6',
       show: false, // Don't show until ready
       webPreferences: {
         nodeIntegration: false,
@@ -177,12 +201,48 @@ class App {
       this.mainWindow!.focus();
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      this.mainWindow.loadURL('http://localhost:3000');
-      this.mainWindow.webContents.openDevTools();
-    } else {
-      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
-    }
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      this.rendererRecoveryAttempts = 0;
+    });
+
+    this.mainWindow.webContents.on('render-process-gone', (_, details) => {
+      console.error('[App] Renderer process gone:', details);
+      this.recoverRenderer(`render process gone (${details.reason})`);
+    });
+
+    this.mainWindow.webContents.on('did-fail-load', (_, errorCode, errorDescription) => {
+      console.error('[App] Renderer failed to load:', errorCode, errorDescription);
+      if (errorCode !== -3) {
+        this.recoverRenderer(`did-fail-load ${errorCode}: ${errorDescription}`);
+      }
+    });
+
+    this.mainWindow.webContents.on('unresponsive', () => {
+      console.warn('[App] Renderer became unresponsive');
+      if (this.unresponsiveTimer) {
+        clearTimeout(this.unresponsiveTimer);
+      }
+
+      this.unresponsiveTimer = setTimeout(() => {
+        this.recoverRenderer('renderer unresponsive timeout');
+      }, 15000);
+    });
+
+    this.mainWindow.webContents.on('responsive', () => {
+      if (this.unresponsiveTimer) {
+        clearTimeout(this.unresponsiveTimer);
+        this.unresponsiveTimer = null;
+      }
+    });
+
+    this.mainWindow.on('closed', () => {
+      if (this.unresponsiveTimer) {
+        clearTimeout(this.unresponsiveTimer);
+        this.unresponsiveTimer = null;
+      }
+    });
+
+    this.loadMainWindowContents();
   }
 
   private setupProtocolHandlers() {
@@ -288,6 +348,13 @@ class App {
 
     ipcMain.handle('Compile.Cancel', async (_, payload) => {
       return this.compileOrchestrator.cancel(payload.jobId);
+    });
+
+    ipcMain.handle('SyncTex.InverseSearch', async (_, payload) => {
+      const project = await this.projectService.getById(payload.projectId);
+      if (!project) return null;
+      const pdfPath = join(project.root, 'output', 'main.pdf');
+      return await this.syncTexService.inverseSearch(project.root, pdfPath, payload.page, payload.x, payload.y);
     });
 
     // Milestone 13: Clean build directory
@@ -542,133 +609,188 @@ class App {
       };
     });
 
-    // Git service handlers
-    ipcMain.handle('Git.Initialize', async (_, payload) => {
+    // ─── Helper: wrap IPC handler with serializable error ──────────────
+    const safeHandle = (channel: string, handler: (event: any, payload: any) => Promise<any>) => {
+      ipcMain.handle(channel, async (event, payload) => {
+        try {
+          return await handler(event, payload);
+        } catch (err: any) {
+          // Re-throw with a plain string message that Electron can serialize
+          const message = err?.message || String(err);
+          throw new Error(message);
+        }
+      });
+    };
+
+    // ─── Git service handlers ─────────────────────────────────────────
+    safeHandle('Git.Initialize', async (_, payload) => {
       const success = await GitService.initialize(payload.projectPath);
       return { success };
     });
 
-    ipcMain.handle('Git.InitRepository', async (_, payload) => {
+    safeHandle('Git.InitRepository', async (_, payload) => {
       await GitService.initRepository(payload.projectPath);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.GetStatus', async () => {
+    safeHandle('Git.GetStatus', async () => {
       const files = await GitService.getStatus();
       return { files };
     });
 
-    ipcMain.handle('Git.StageFiles', async (_, payload) => {
+    safeHandle('Git.StageFiles', async (_, payload) => {
       await GitService.stageFiles(payload.files);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.UnstageFiles', async (_, payload) => {
+    safeHandle('Git.StageAll', async () => {
+      await GitService.stageAll();
+      return { ok: true };
+    });
+
+    safeHandle('Git.UnstageFiles', async (_, payload) => {
       await GitService.unstageFiles(payload.files);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.Commit', async (_, payload) => {
+    safeHandle('Git.Commit', async (_, payload) => {
       const commit = await GitService.commit(payload.message);
       return { commit };
     });
 
-    ipcMain.handle('Git.GetLog', async (_, payload) => {
-      const log = await GitService.getLog(payload.maxCount || 50);
+    safeHandle('Git.GetLog', async (_, payload) => {
+      const log = await GitService.getLog(payload?.maxCount || 50);
       return { log };
     });
 
-    ipcMain.handle('Git.GetBranches', async () => {
+    safeHandle('Git.GetBranches', async () => {
       const branches = await GitService.getBranches();
       return { branches };
     });
 
-    ipcMain.handle('Git.CreateBranch', async (_, payload) => {
+    safeHandle('Git.CreateBranch', async (_, payload) => {
       await GitService.createBranch(payload.name, payload.checkout);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.CheckoutBranch', async (_, payload) => {
+    safeHandle('Git.CheckoutBranch', async (_, payload) => {
       await GitService.checkoutBranch(payload.name);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.DeleteBranch', async (_, payload) => {
+    safeHandle('Git.DeleteBranch', async (_, payload) => {
       await GitService.deleteBranch(payload.name, payload.force);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.Push', async (_, payload) => {
+    safeHandle('Git.RenameBranch', async (_, payload) => {
+      await GitService.renameBranch(payload.oldName, payload.newName);
+      return { ok: true };
+    });
+
+    safeHandle('Git.Merge', async (_, payload) => {
+      const result = await GitService.mergeBranch(payload.branch);
+      return { result };
+    });
+
+    safeHandle('Git.Push', async (_, payload) => {
       await GitService.push(payload.remote, payload.branch, payload.setUpstream);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.Pull', async (_, payload) => {
+    safeHandle('Git.Pull', async (_, payload) => {
       await GitService.pull(payload.remote, payload.branch);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.Fetch', async (_, payload) => {
-      await GitService.fetch(payload.remote);
+    safeHandle('Git.Fetch', async (_, payload) => {
+      await GitService.fetch(payload?.remote);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.GetRemotes', async () => {
+    safeHandle('Git.GetRemotes', async () => {
       const remotes = await GitService.getRemotes();
       return { remotes };
     });
 
-    ipcMain.handle('Git.AddRemote', async (_, payload) => {
+    safeHandle('Git.AddRemote', async (_, payload) => {
       await GitService.addRemote(payload.name, payload.url);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.RemoveRemote', async (_, payload) => {
+    safeHandle('Git.RemoveRemote', async (_, payload) => {
       await GitService.removeRemote(payload.name);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.GetDiff', async (_, payload) => {
-      const diff = await GitService.getDiff(payload.filePath);
+    safeHandle('Git.GetDiff', async (_, payload) => {
+      const diff = await GitService.getDiff(payload?.filePath);
       return { diff };
     });
 
-    ipcMain.handle('Git.DiscardChanges', async (_, payload) => {
+    safeHandle('Git.GetStagedDiff', async (_, payload) => {
+      const diff = await GitService.getStagedDiff(payload?.filePath);
+      return { diff };
+    });
+
+    safeHandle('Git.GetFileDiff', async (_, payload) => {
+      const diff = await GitService.getFileDiff(payload.filePath, payload.staged);
+      return { diff };
+    });
+
+    safeHandle('Git.DiscardChanges', async (_, payload) => {
       await GitService.discardChanges(payload.files);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.Clone', async (_, payload) => {
+    safeHandle('Git.Clone', async (_, payload) => {
       await GitService.clone(payload.url, payload.targetPath);
       return { ok: true };
     });
 
-    ipcMain.handle('Git.GetCurrentBranch', async () => {
+    safeHandle('Git.GetCurrentBranch', async () => {
       const branch = await GitService.getCurrentBranch();
       return { branch };
     });
 
-    ipcMain.handle('Git.IsClean', async () => {
+    safeHandle('Git.IsClean', async () => {
       const clean = await GitService.isClean();
       return { clean };
     });
 
-    // GitHub service handlers
-    ipcMain.handle('GitHub.Authenticate', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const user = await github.authenticateWithToken(payload.token);
+    safeHandle('Git.Stash', async (_, payload) => {
+      await GitService.stash(payload?.message);
+      return { ok: true };
+    });
+
+    safeHandle('Git.StashPop', async (_, payload) => {
+      await GitService.stashPop(payload?.index);
+      return { ok: true };
+    });
+
+    safeHandle('Git.StashDrop', async (_, payload) => {
+      await GitService.stashDrop(payload?.index);
+      return { ok: true };
+    });
+
+    safeHandle('Git.StashList', async () => {
+      const stashes = await GitService.stashList();
+      return { stashes };
+    });
+
+    // ─── GitHub service handlers ──────────────────────────────────────
+    safeHandle('GitHub.Authenticate', async (_, payload) => {
+      const user = await GitHubServiceInstance.authenticateWithToken(payload.token);
       return { user };
     });
 
-    ipcMain.handle('GitHub.StartBrowserAuth', async () => {
-      const github = await this.getGitHubService();
-      const session = await github.startBrowserAuth();
+    safeHandle('GitHub.StartBrowserAuth', async () => {
+      const session = await GitHubServiceInstance.startBrowserAuth();
       return { session };
     });
 
-    ipcMain.handle('GitHub.CompleteBrowserAuth', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const user = await github.completeBrowserAuth(
+    safeHandle('GitHub.CompleteBrowserAuth', async (_, payload) => {
+      const user = await GitHubServiceInstance.completeBrowserAuth(
         payload.deviceCode,
         payload.interval,
         payload.expiresAt
@@ -676,33 +798,33 @@ class App {
       return { user };
     });
 
-    ipcMain.handle('GitHub.SignOut', async () => {
-      const github = await this.getGitHubService();
-      github.signOut();
+    safeHandle('GitHub.SignOut', async () => {
+      GitHubServiceInstance.signOut();
       return { ok: true };
     });
 
-    ipcMain.handle('GitHub.IsAuthenticated', async () => {
-      const github = await this.getGitHubService();
-      const authenticated = github.isAuthenticated();
+    safeHandle('GitHub.IsAuthenticated', async () => {
+      const authenticated = await GitHubServiceInstance.isAuthenticated();
       return { authenticated };
     });
 
-    ipcMain.handle('GitHub.GetCurrentUser', async () => {
-      const github = await this.getGitHubService();
-      const user = await github.getCurrentUser();
+    safeHandle('GitHub.IsBrowserAuthAvailable', async () => {
+      const available = GitHubServiceInstance.isBrowserAuthAvailable();
+      return { available };
+    });
+
+    safeHandle('GitHub.GetCurrentUser', async () => {
+      const user = await GitHubServiceInstance.getCurrentUser();
       return { user };
     });
 
-    ipcMain.handle('GitHub.GetRepositories', async () => {
-      const github = await this.getGitHubService();
-      const repos = await github.getRepositories();
+    safeHandle('GitHub.GetRepositories', async () => {
+      const repos = await GitHubServiceInstance.getRepositories();
       return { repos };
     });
 
-    ipcMain.handle('GitHub.CreateRepository', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const repo = await github.createRepository(
+    safeHandle('GitHub.CreateRepository', async (_, payload) => {
+      const repo = await GitHubServiceInstance.createRepository(
         payload.name,
         payload.description,
         payload.isPrivate
@@ -710,9 +832,8 @@ class App {
       return { repo };
     });
 
-    ipcMain.handle('GitHub.GetPullRequests', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const prs = await github.getPullRequests(
+    safeHandle('GitHub.GetPullRequests', async (_, payload) => {
+      const prs = await GitHubServiceInstance.getPullRequests(
         payload.owner,
         payload.repo,
         payload.state
@@ -720,9 +841,8 @@ class App {
       return { prs };
     });
 
-    ipcMain.handle('GitHub.CreatePullRequest', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const pr = await github.createPullRequest(
+    safeHandle('GitHub.CreatePullRequest', async (_, payload) => {
+      const pr = await GitHubServiceInstance.createPullRequest(
         payload.owner,
         payload.repo,
         payload.title,
@@ -733,21 +853,18 @@ class App {
       return { pr };
     });
 
-    ipcMain.handle('GitHub.ForkRepository', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const fork = await github.forkRepository(payload.owner, payload.repo);
+    safeHandle('GitHub.ForkRepository', async (_, payload) => {
+      const fork = await GitHubServiceInstance.forkRepository(payload.owner, payload.repo);
       return { fork };
     });
 
-    ipcMain.handle('GitHub.ParseUrl', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const parsed = github.parseGitHubUrl(payload.url);
+    safeHandle('GitHub.ParseUrl', async (_, payload) => {
+      const parsed = GitHubServiceInstance.parseGitHubUrl(payload.url);
       return { parsed };
     });
 
-    ipcMain.handle('GitHub.InviteCollaborator', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const invite = await github.inviteCollaborator(
+    safeHandle('GitHub.InviteCollaborator', async (_, payload) => {
+      const invite = await GitHubServiceInstance.inviteCollaborator(
         payload.owner,
         payload.repo,
         payload.username,
@@ -756,15 +873,13 @@ class App {
       return { invite };
     });
 
-    ipcMain.handle('GitHub.GetCollaborators', async (_, payload) => {
-      const github = await this.getGitHubService();
-      const collaborators = await github.getCollaborators(payload.owner, payload.repo);
+    safeHandle('GitHub.GetCollaborators', async (_, payload) => {
+      const collaborators = await GitHubServiceInstance.getCollaborators(payload.owner, payload.repo);
       return { collaborators };
     });
 
-    ipcMain.handle('GitHub.GetCredentials', async () => {
-      const github = await this.getGitHubService();
-      const credentials = github.getCredentials();
+    safeHandle('GitHub.GetCredentials', async () => {
+      const credentials = GitHubServiceInstance.getCredentials();
       return { credentials };
     });
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ProjectExplorer } from './components/ProjectExplorer';
 import { FileTree } from './components/FileTree';
 import { VirtualizedFileTree } from './components/VirtualizedFileTree';
@@ -17,6 +17,8 @@ import { CollapsibleSidebar } from './components/CollapsibleSidebar';
 import SettingsModal from './components/SettingsModal';
 import { ImageOverlay } from './components/ImageOverlay';
 import { SourceControl } from './components/SourceControl';
+
+const MAX_LOG_LINES = 2000;
 
 export interface Project {
   id: string;
@@ -71,6 +73,23 @@ function App() {
   const [isAutoCompileEnabled, setIsAutoCompileEnabled] = useState(false);
   const [autoCompileDelay, setAutoCompileDelay] = useState(750); // Default 750ms
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Theme state
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('app-theme') as 'light' | 'dark' | 'system') || 'system';
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    if (theme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+    localStorage.setItem('app-theme', theme);
+  }, [theme]);
 
   // Milestone 6: Error parsing and source mapping state
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -135,6 +154,15 @@ function App() {
   // concurrent dialogs while window.confirm is still open.
   const lastExternalChangeHandled = useRef<Map<string, number>>(new Map());
 
+  const appendLogLine = useCallback((line: string) => {
+    setLogs(prev => {
+      if (prev.length >= MAX_LOG_LINES) {
+        return [...prev.slice(prev.length - MAX_LOG_LINES + 1), line];
+      }
+      return [...prev, line];
+    });
+  }, []);
+
   // Helper function to check if file is an image
   const isImageFile = (fileName: string): boolean => {
     if (!fileName) return false;
@@ -146,6 +174,28 @@ function App() {
   useEffect(() => {
     (window as any).currentProject = currentProject;
   }, [currentProject]);
+
+  // Sync dark mode
+  useEffect(() => {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    const listener = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', listener);
+    return () => mediaQuery.removeEventListener('change', listener);
+  }, []);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -304,9 +354,7 @@ function App() {
   // Set up compile progress event cleanup on component unmount
   useEffect(() => {
     return () => {
-      // Clean up any remaining progress listeners on unmount
-      const cleanup = () => {};
-      window.electronAPI.removeCompileProgressListener(cleanup);
+      // Individual compile listeners are removed when their jobs finish.
     };
   }, []);
 
@@ -762,7 +810,7 @@ function App() {
         if (data.jobId === result.jobId) {
           // Milestone 4: Append live lines to log
           if (data.line) {
-            setLogs(prev => [...prev, data.line]);
+            appendLogLine(data.line);
           }
           
           // Update state based on progress
@@ -920,7 +968,7 @@ function App() {
 
     loadAutoCompileDelay();
     loadAutoCompileEnabled();
-  }, []);
+  }, [appendLogLine]);
 
   const activeTab = openTabs.find(tab => tab.id === activeTabId);
 
@@ -1034,7 +1082,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors duration-300">
       <Topbar 
         project={currentProject}
         isCompiling={isCompiling}
@@ -1120,9 +1168,12 @@ function App() {
               }
               right={
                 <PDFViewer 
-                  projectId={currentProject?.id || null} 
+                  projectId={currentProject?.id || null}
                   refreshTrigger={pdfRefreshTrigger}
                   compilationStatus={compilationStatus}
+                  onSyncTexResult={(result) => {
+                    handleErrorClick(result.file, result.line);
+                  }}
                 />
               }
               defaultSplit={60}
@@ -1185,8 +1236,8 @@ function App() {
 
       {/* Source Control Panel */}
       {showSourceControl && currentProject && (
-        <div className="fixed right-0 top-16 bottom-0 w-80 bg-gray-900 shadow-2xl z-40">
-          <SourceControl />
+        <div className="fixed right-0 top-12 bottom-0 w-[min(20rem,calc(100vw-3rem))] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-2xl z-40">
+          <SourceControl projectRoot={currentProject.root} />
         </div>
       )}
 
@@ -1217,6 +1268,8 @@ function App() {
         onToggleAutoCompile={handleToggleAutoCompile}
         autoCompileDelay={autoCompileDelay}
         onAutoCompileDelayChange={handleAutoCompileDelayChange}
+        theme={theme}
+        onThemeChange={setTheme}
       />
 
       {/* Milestone 8: Bibliography Manager */}

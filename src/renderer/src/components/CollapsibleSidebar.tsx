@@ -19,7 +19,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     // When width is controlled externally (e.g., by ResizableSplitter)
     // Always render content, but can use isVisible for other visual states if needed
     return (
-      <div className="bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+      <div className="bg-white/30 dark:bg-gray-950/30 backdrop-blur-md border-r border-gray-200/50 dark:border-gray-800/50 flex flex-col h-full overflow-hidden">
         {children}
       </div>
     );
@@ -32,7 +32,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       <div
         className={`${
           isVisible ? width : 'w-0'
-        } bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden h-full`}
+        } bg-white/30 dark:bg-gray-950/30 backdrop-blur-md border-r border-gray-200/50 dark:border-gray-800/50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden h-full`}
       >
         {children}
       </div>
@@ -58,7 +58,7 @@ export const SidebarToggle: React.FC<SidebarToggleProps> = ({
   return (
     <button
       onClick={onToggle}
-      className={`p-2 rounded hover:bg-gray-100 transition-colors duration-150 ${className}`}
+      className={`p-2 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 transition-all duration-200 ${className}`}
       title={`${isVisible ? 'Hide' : 'Show'} File Explorer (${shortcut})`}
     >
       <svg 

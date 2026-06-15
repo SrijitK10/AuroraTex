@@ -628,6 +628,12 @@ export class CompileOrchestrator extends EventEmitter {
         });
       }
 
+      // Copy SyncTeX file if it exists
+      const synctexPath = join(buildDir, project.mainFile.replace('.tex', '.synctex.gz'));
+      if (existsSync(synctexPath)) {
+        await this.robustFileCopy(synctexPath, join(outputDir, 'main.synctex.gz'), 'main.synctex.gz');
+      }
+
       job.progress = 100;
       job.endTime = new Date();
 
@@ -723,6 +729,7 @@ export class CompileOrchestrator extends EventEmitter {
         '-interaction=nonstopmode',
         '-halt-on-error',
         '-file-line-error',
+        '-synctex=1',
       ];
 
       // Milestone 10: Shell-escape control - default OFF, explicit opt-in required

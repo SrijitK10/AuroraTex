@@ -67,14 +67,14 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs, isCompiling, onClose, 
       />
       {/* Panel Container */}
       <div className={`log-panel-container ${isOpen ? 'open' : ''}`}>
-        <div className="h-full bg-gray-900 flex flex-col">
+        <div className="h-full flex flex-col">
           {/* Log panel header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
+          <div className="flex items-center justify-between px-4 py-3 glass-header">
             <div className="flex items-center space-x-3">
-              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="text-sm font-medium text-white">Compilation Logs</h3>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">Compilation Logs</h3>
               {isCompiling && (
                 <div className="flex items-center space-x-2 text-blue-400">
                   <div className="animate-spin h-3 w-3 border border-blue-400 border-t-transparent rounded-full"></div>
@@ -89,7 +89,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs, isCompiling, onClose, 
                     logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
                   }
                 }}
-                className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
                 title="Scroll to bottom"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs, isCompiling, onClose, 
               
               <button
                 onClick={onClose}
-                className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
                 title="Close compilation logs"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,15 +112,15 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs, isCompiling, onClose, 
           {/* Log content */}
           <div 
             ref={logContainerRef}
-            className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-gray-900"
+            className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-transparent custom-scrollbar"
           >
             {logs.length === 0 ? (
-              <div className="text-gray-500 text-center py-8">
-                <svg className="w-8 h-8 mx-auto mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <div className="text-gray-500 dark:text-gray-400 text-center py-8">
+                <svg className="w-8 h-8 mx-auto mb-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <p>No logs yet</p>
-                <p className="text-xs text-gray-600 mt-1">Compile your project to see output here</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Compile your project to see output here</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -135,8 +135,8 @@ export const LogPanel: React.FC<LogPanelProps> = ({ logs, isCompiling, onClose, 
           </div>
 
           {/* Footer with log count */}
-          <div className="border-t border-gray-700 px-4 py-2 bg-gray-800">
-            <div className="flex items-center justify-between text-xs text-gray-400">
+          <div className="border-t border-gray-200/50 dark:border-gray-800/50 px-4 py-2 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>{logs.length} log line{logs.length !== 1 ? 's' : ''}</span>
               <span>Press Esc to close</span>
             </div>

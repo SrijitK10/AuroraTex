@@ -175,8 +175,8 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         />
         {/* Panel Container */}
         <div className={`history-panel-container ${isOpen ? 'open' : ''}`}>
-          <div className={`history-panel h-full ${className}`}>
-            <div className="p-4 text-center text-gray-500">
+          <div className={`h-full flex flex-col bg-transparent ${className}`}>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
               <p>No project selected</p>
             </div>
           </div>
@@ -194,33 +194,33 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       />
       {/* Panel Container */}
       <div className={`history-panel-container ${isOpen ? 'open' : ''}`}>
-        <div className={`history-panel h-full ${className}`}>
+        <div className={`h-full flex flex-col bg-transparent ${className}`}>
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3 bg-gray-50">
+      <div className="glass-header px-4 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900 flex items-center">
-            <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white flex items-center">
+            <svg className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Project History
           </h3>
           <button 
             onClick={onClose}
-            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-800/50 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
             title="Close history panel"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
       </div>
 
       {/* Create New Snapshot */}
-      <div className="border-b border-gray-200 p-4 bg-white">
+      <div className="border-b border-gray-200/50 dark:border-gray-800/50 p-4 bg-white/30 dark:bg-gray-950/30 backdrop-blur-md">
         <div className="space-y-3">
           <div>
-            <label htmlFor="snapshot-message" className="block text-xs font-medium text-gray-700 mb-1">
+            <label htmlFor="snapshot-message" className="block text-xs font-medium text-gray-900 dark:text-gray-100 mb-1.5">
               Create New Snapshot
             </label>
             <input
@@ -229,14 +229,14 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
               value={newSnapshotMessage}
               onChange={(e) => setNewSnapshotMessage(e.target.value)}
               placeholder="Optional description (e.g., 'Before major refactor')"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="minimal-input"
               disabled={creating || restoring !== null}
             />
           </div>
           <button
             onClick={createSnapshot}
             disabled={creating || restoring !== null}
-            className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="minimal-button-primary w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {creating ? (
               <>
@@ -257,14 +257,14 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
       {/* Auto-snapshot Settings */}
       {autoSnapshotSettings && onAutoSnapshotSettingsChange && (
-        <div className="border-b border-gray-200 p-4 bg-gray-50">
+        <div className="border-b border-gray-200/50 dark:border-gray-800/50 p-4 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-gray-700">Auto-Snapshot Settings</label>
+              <label className="text-xs font-medium text-gray-900 dark:text-gray-100">Auto-Snapshot Settings</label>
             </div>
             
             <div className="space-y-2">
-              <label className="flex items-center text-xs">
+              <label className="flex items-center text-xs cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={autoSnapshotSettings.onAppClose}
@@ -272,12 +272,12 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                     ...autoSnapshotSettings,
                     onAppClose: e.target.checked
                   })}
-                  className="mr-2 h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="mr-2 h-3.5 w-3.5 text-blue-600 focus:ring-blue-500/50 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded transition-colors"
                 />
-                <span className="text-gray-600">Auto-snapshot on app close</span>
+                <span className="text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200 transition-colors">Auto-snapshot on app close</span>
               </label>
               
-              <label className="flex items-center text-xs">
+              <label className="flex items-center text-xs cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={autoSnapshotSettings.onProjectSwitch}
@@ -285,13 +285,13 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                     ...autoSnapshotSettings,
                     onProjectSwitch: e.target.checked
                   })}
-                  className="mr-2 h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="mr-2 h-3.5 w-3.5 text-blue-600 focus:ring-blue-500/50 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded transition-colors"
                 />
-                <span className="text-gray-600">Auto-snapshot on project switch</span>
+                <span className="text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200 transition-colors">Auto-snapshot on project switch</span>
               </label>
               
-              <div className="space-y-1">
-                <label className="flex items-center text-xs">
+              <div className="space-y-2">
+                <label className="flex items-center text-xs cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={autoSnapshotSettings.periodic}
@@ -299,14 +299,14 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                       ...autoSnapshotSettings,
                       periodic: e.target.checked
                     })}
-                    className="mr-2 h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="mr-2 h-3.5 w-3.5 text-blue-600 focus:ring-blue-500/50 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded transition-colors"
                   />
-                  <span className="text-gray-600">Periodic auto-snapshots</span>
+                  <span className="text-gray-600 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200 transition-colors">Periodic auto-snapshots</span>
                 </label>
                 
                 {autoSnapshotSettings.periodic && (
                   <div className="ml-5 flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">Every</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Every</span>
                     <input
                       type="number"
                       min="5"
@@ -316,9 +316,9 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                         ...autoSnapshotSettings,
                         periodicIntervalMinutes: Math.max(5, parseInt(e.target.value) || 30)
                       })}
-                      className="w-12 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-12 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-transparent dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
-                    <span className="text-xs text-gray-500">minutes</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">minutes</span>
                   </div>
                 )}
               </div>
@@ -328,34 +328,34 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       )}
 
       {/* Snapshots List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin mx-auto h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-            <p className="mt-2 text-sm text-gray-500">Loading snapshots...</p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading snapshots...</p>
           </div>
         ) : snapshots.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            <svg className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-lg font-medium">No snapshots yet</p>
-            <p className="text-sm text-gray-400 mt-1">Create your first snapshot to save the current state</p>
+            <p className="text-lg font-medium text-gray-900 dark:text-gray-100">No snapshots yet</p>
+            <p className="text-sm text-gray-450 dark:text-gray-400 mt-1">Create your first snapshot to save the current state</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200/50 dark:divide-gray-800/50">
             {snapshots.map((snapshot) => {
               const isAutoSnapshot = snapshot.message?.includes('Auto-') || snapshot.message?.includes('auto-');
               
               return (
-                <div key={snapshot.id} className="p-4 hover:bg-gray-50 transition-colors">
+                <div key={snapshot.id} className="p-4 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                           isAutoSnapshot ? 'bg-green-500' : 'bg-blue-500'
                         }`}></div>
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-200 truncate">
                           {snapshot.message || 'Untitled Snapshot'}
                         </p>
                         {isAutoSnapshot && (
@@ -388,7 +388,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   <button
                     onClick={() => restoreSnapshot(snapshot.id, snapshot.message)}
                     disabled={restoring !== null}
-                    className="ml-3 px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-500 shadow-md shadow-green-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                   >
                     {restoring === snapshot.id ? (
                       <>
@@ -413,8 +413,8 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="border-t border-gray-200 px-4 py-2 bg-gray-50">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="border-t border-gray-200/50 dark:border-gray-800/50 px-4 py-2 glass-header">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</span>
           <button
             onClick={loadSnapshots}

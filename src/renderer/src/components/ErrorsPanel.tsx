@@ -53,14 +53,14 @@ export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({
       />
       {/* Panel Container */}
       <div className={`errors-panel-container ${isOpen ? 'open' : ''}`}>
-        <div className="h-full bg-gray-900 flex flex-col">
+        <div className="h-full flex flex-col">
           {/* Errors panel header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
+          <div className="flex items-center justify-between px-4 py-3 glass-header">
             <div className="flex items-center space-x-3">
-              <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-500 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
-              <h3 className="text-sm font-medium text-white">Compilation Issues</h3>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">Compilation Issues</h3>
               <div className="flex items-center space-x-3 text-xs">
                 {errorCount > 0 && (
                   <span className="flex items-center text-red-400 bg-red-900/20 px-2 py-1 rounded">
@@ -82,7 +82,7 @@ export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+              className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
               title="Close errors panel"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,23 +92,19 @@ export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({
           </div>
 
           {/* Error content */}
-          <div className="flex-1 overflow-y-auto bg-gray-900">
+          <div className="flex-1 overflow-y-auto bg-transparent custom-scrollbar">
             {errors.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <div className="mb-4">
-                  <svg className="w-12 h-12 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-lg text-gray-300">No errors or warnings found</p>
-                <p className="text-sm text-gray-500 mt-2">Your LaTeX compilation was successful!</p>
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                <div className="text-green-500 text-4xl mb-3">✓</div>
+                <p className="text-lg font-medium text-gray-800 dark:text-gray-300">No errors or warnings found</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Your LaTeX compilation was successful!</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-700">
+              <div className="divide-y divide-gray-200/50 dark:divide-gray-800/50">
                 {errors.map((error, index) => (
                   <div
                     key={index}
-                    className={`flex items-start p-4 hover:bg-gray-800 cursor-pointer transition-colors ${
+                    className={`flex items-start p-4 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${
                       error.severity === 'error' 
                         ? 'border-l-4 border-l-red-500' 
                         : error.severity === 'warning'
@@ -138,22 +134,22 @@ export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-200 break-words">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-200 break-words">
                             {error.message}
                           </p>
-                          <div className="flex items-center mt-2 text-xs text-gray-400">
-                            <span className="font-mono bg-gray-800 px-2 py-1 rounded text-gray-300">
+                          <div className="flex items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="font-mono bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
                               {error.file}
                             </span>
                             <span className="mx-2">:</span>
-                            <span className="font-mono text-gray-400">
+                            <span className="font-mono text-gray-500 dark:text-gray-400">
                               line {error.line}
                               {error.column && `:${error.column}`}
                             </span>
                           </div>
                         </div>
                         <div className="ml-3 flex-shrink-0">
-                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </div>
@@ -166,8 +162,8 @@ export const ErrorsPanel: React.FC<ErrorsPanelProps> = ({
           </div>
 
           {/* Footer with error count */}
-          <div className="border-t border-gray-700 px-4 py-2 bg-gray-800">
-            <div className="flex items-center justify-between text-xs text-gray-400">
+          <div className="border-t border-gray-200/50 dark:border-gray-800/50 px-4 py-2 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>
                 {errors.length === 0 
                   ? 'No issues found' 

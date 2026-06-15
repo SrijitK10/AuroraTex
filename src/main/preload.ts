@@ -38,6 +38,9 @@ export interface ElectronAPI {
   // Milestone 13: Clean build API
   compileCleanBuildDir: (payload: { projectId: string }) => Promise<{ ok: boolean }>;
 
+  // SyncTeX API
+  syncTexInverseSearch: (payload: { projectId: string; page: number; x: number; y: number }) => Promise<{ file: string; line: number; column?: number } | null>;
+
   // Snapshot APIs
   snapshotCreate: (payload: { projectId: string; message?: string }) => Promise<any>;
   snapshotList: (payload: { projectId: string }) => Promise<any[]>;
@@ -129,6 +132,9 @@ const electronAPI: ElectronAPI = {
   compileResetProjectState: (payload) => ipcRenderer.invoke('Compile.ResetProjectState', payload),
   // Milestone 13: Clean build API
   compileCleanBuildDir: (payload) => ipcRenderer.invoke('Compile.CleanBuildDir', payload),
+
+  // SyncTeX API
+  syncTexInverseSearch: (payload) => ipcRenderer.invoke('SyncTex.InverseSearch', payload),
 
   // Snapshot APIs
   snapshotCreate: (payload) => ipcRenderer.invoke('Snapshot.Create', payload),

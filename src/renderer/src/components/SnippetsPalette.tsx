@@ -172,20 +172,20 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Insert Snippet</h3>
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Insert Snippet</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-250 text-xl font-bold"
           >
             ×
           </button>
         </div>
 
         {/* Search and Filters */}
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex space-x-4 mb-3">
             <input
               ref={searchInputRef}
@@ -193,19 +193,19 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search snippets... (try 'figure', 'table', 'equation')"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               {categories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
             {filteredSnippets.length} snippet{filteredSnippets.length !== 1 ? 's' : ''} found
             • Use ↑↓ arrows (or Tab) to navigate • Enter to insert • Home/End to jump • Esc to close
           </div>
@@ -214,14 +214,14 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
         {/* Snippets List */}
         <div className="flex-1 overflow-y-auto">
           {filteredSnippets.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               {searchQuery ? 
                 `No snippets found matching "${searchQuery}"` : 
                 'No snippets available'
               }
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredSnippets.map((snippet, index) => (
                 <div
                   key={snippet.id}
@@ -229,8 +229,8 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
                   onClick={() => insertSnippet(snippet)}
                   className={`p-4 cursor-pointer transition-colors ${
                     index === selectedIndex 
-                      ? 'bg-blue-50 border-l-4 border-blue-500' 
-                      : 'hover:bg-gray-50'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' 
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -241,20 +241,20 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
                         </svg>
                       )}
                       <div>
-                        <h4 className="font-medium text-gray-900">{snippet.name}</h4>
-                        <p className="text-sm text-gray-600">{snippet.description}</p>
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100">{snippet.name}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{snippet.description}</p>
                       </div>
                     </div>
                     <div className="flex space-x-2">
-                      <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                      <span className="inline-block bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded">
                         {snippet.category}
                       </span>
-                      <span className="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-mono">
+                      <span className="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs px-2 py-1 rounded font-mono">
                         {snippet.trigger}
                       </span>
                     </div>
                   </div>
-                  <div className="bg-gray-100 rounded p-2 font-mono text-sm text-gray-700 overflow-x-auto">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded p-2 font-mono text-sm text-gray-700 dark:text-gray-300 overflow-x-auto">
                     <pre className="whitespace-pre-wrap">{snippet.content}</pre>
                   </div>
                 </div>
@@ -264,10 +264,10 @@ export const SnippetsPalette: React.FC<SnippetsPaletteProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="text-sm text-gray-600">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
             <span className="font-medium">Tip:</span> You can also type a snippet trigger (like "figure") 
-            in the editor and press <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Ctrl+Shift+P</kbd> or <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Ctrl+.</kbd> to quickly insert it.
+            in the editor and press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-800 rounded text-xs dark:text-gray-350">Ctrl+Shift+P</kbd> or <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-800 rounded text-xs dark:text-gray-350">Ctrl+.</kbd> to quickly insert it.
           </div>
         </div>
       </div>

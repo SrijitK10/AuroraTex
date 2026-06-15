@@ -172,12 +172,12 @@ export const BibManager: React.FC<BibManagerProps> = ({
 
   return (
     <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${className}`}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Bibliography Manager</h3>
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bibliography Manager</h3>
+            <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
               <span>Editing: {fileName}</span>
               {hasUnsavedChanges && (
                 <span className="inline-flex items-center space-x-1">
@@ -206,7 +206,7 @@ export const BibManager: React.FC<BibManagerProps> = ({
             </button>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold"
             >
               ×
             </button>
@@ -215,21 +215,21 @@ export const BibManager: React.FC<BibManagerProps> = ({
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left Panel - Entry List */}
-          <div className="w-1/2 border-r border-gray-200 flex flex-col">
+          <div className="w-1/2 border-r border-gray-200 dark:border-gray-800 flex flex-col">
             {/* Search and Filters */}
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
               <div className="flex space-x-3 mb-3">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search entries..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
                 />
                 <select
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
                 >
                   {availableTypes.map(type => (
                     <option key={type} value={type}>{type}</option>
@@ -247,7 +247,7 @@ export const BibManager: React.FC<BibManagerProps> = ({
             {/* Entry List */}
             <div className="flex-1 overflow-y-auto">
               {filteredEntries.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                   {entries.length === 0 ? (
                     <>
                       <p className="mb-2">No bibliography entries found.</p>
@@ -258,24 +258,24 @@ export const BibManager: React.FC<BibManagerProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
                   {filteredEntries.map((entry) => (
                     <div
                       key={entry.id}
                       onClick={() => setEditingEntry(entry)}
                       className={`p-3 cursor-pointer transition-colors ${
                         editingEntry?.id === entry.id 
-                          ? 'bg-blue-50 border-l-4 border-blue-500' 
-                          : 'hover:bg-gray-50'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' 
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
                       }`}
                     >
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-medium text-gray-900 text-sm">{entry.key}</h4>
-                          <p className="text-xs text-gray-600 mb-1">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm">{entry.key}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                             {entry.fields.title || entry.fields.author || 'No title/author'}
                           </p>
-                          <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                          <span className="inline-block bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded">
                             {entry.type}
                           </span>
                         </div>
@@ -306,7 +306,7 @@ export const BibManager: React.FC<BibManagerProps> = ({
                 entryTypes={entryTypes}
               />
             ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
+              <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50">
                 <div className="text-center">
                   <p className="mb-2">Select an entry to edit</p>
                   <p className="text-sm">or create a new one to get started</p>
@@ -319,17 +319,17 @@ export const BibManager: React.FC<BibManagerProps> = ({
         {/* New Entry Modal */}
         {showNewEntryModal && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">Create New Entry</h4>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 w-full max-w-md">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Entry</h4>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Entry Type
                 </label>
                 <select
                   value={selectedEntryType}
                   onChange={(e) => setSelectedEntryType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   {entryTypes.map((type) => (
                     <option key={type.type} value={type.type}>
@@ -342,7 +342,7 @@ export const BibManager: React.FC<BibManagerProps> = ({
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowNewEntryModal(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   Cancel
                 </button>
@@ -430,30 +430,30 @@ const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onUpdate, entryTypes }
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200">
-        <h4 className="font-medium text-gray-900 mb-3">Edit Entry</h4>
+      <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Edit Entry</h4>
         
         {/* Key and Type */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Citation Key *
             </label>
             <input
               type="text"
               value={localEntry.key}
               onChange={(e) => updateField('key', e.target.value)}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Entry Type *
             </label>
             <select
               value={localEntry.type}
               onChange={(e) => updateField('type', e.target.value)}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               {entryTypes.map((type) => (
                 <option key={type.type} value={type.type}>
@@ -471,16 +471,16 @@ const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onUpdate, entryTypes }
           {allFields.map((fieldName) => (
             <div key={fieldName} className="flex items-start space-x-2">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {fieldName}
                   {recommendedFields.includes(fieldName) && (
-                    <span className="text-blue-600">*</span>
+                    <span className="text-blue-600 dark:text-blue-400">*</span>
                   )}
                 </label>
                 <textarea
                   value={localEntry.fields[fieldName] || ''}
                   onChange={(e) => updateField(fieldName, e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   rows={fieldName === 'abstract' ? 3 : 1}
                 />
               </div>
@@ -499,7 +499,7 @@ const EntryEditor: React.FC<EntryEditorProps> = ({ entry, onUpdate, entryTypes }
 
         <button
           onClick={addField}
-          className="mt-4 w-full px-3 py-2 border-2 border-dashed border-gray-300 text-gray-600 rounded-md hover:border-gray-400 transition-colors text-sm"
+          className="mt-4 w-full px-3 py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors text-sm"
         >
           + Add Custom Field
         </button>

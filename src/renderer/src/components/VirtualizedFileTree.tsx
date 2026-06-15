@@ -74,6 +74,24 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
   const [draggedNode, setDraggedNode] = useState<FileNode | null>(null);
   const [dragOverNode, setDragOverNode] = useState<string | null>(null);
 
+  const resetDragState = useCallback(() => {
+    setDraggedNode(null);
+    setDragOverNode(null);
+  }, []);
+
+  const getTargetDirectoryPath = useCallback((targetNode?: FileNode) => {
+    if (!targetNode) {
+      return '';
+    }
+
+    if (targetNode.type === 'directory') {
+      return targetNode.path;
+    }
+
+    const lastSlashIndex = targetNode.path.lastIndexOf('/');
+    return lastSlashIndex === -1 ? '' : targetNode.path.slice(0, lastSlashIndex);
+  }, []);
+
   // Flatten the file tree for virtualization
   const flattenedNodes = useMemo(() => {
     const flattened: FlatNode[] = [];
@@ -144,11 +162,6 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [contextMenu.visible]);
-
-  // Notify parent component when file creation state changes
-  useEffect(() => {
-    onFileCreationChange?.(creatingNode !== null);
-  }, [creatingNode, onFileCreationChange]);
 
   // Notify parent component when file creation state changes
   useEffect(() => {
@@ -290,6 +303,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent, node: FileNode) => {
+    e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', node.path);
     setDraggedNode(node);
@@ -297,35 +311,38 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
 
   const handleDragOver = (e: React.DragEvent, targetNode?: FileNode) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
-    
-    if (targetNode?.type === 'directory') {
-      setDragOverNode(targetNode.path);
-    } else {
-      setDragOverNode('root');
-    }
+
+    const targetPath = getTargetDirectoryPath(targetNode);
+    setDragOverNode(targetPath || 'root');
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.stopPropagation();
+
+    const relatedTarget = e.relatedTarget;
+    if (relatedTarget instanceof Node && e.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+
     setDragOverNode(null);
   };
 
   const handleDrop = async (e: React.DragEvent, targetNode?: FileNode) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverNode(null);
     
     if (!draggedNode) return;
     
     // Determine the target directory
-    let targetPath = '';
-    if (targetNode?.type === 'directory') {
-      targetPath = targetNode.path;
-    }
+    const targetPath = getTargetDirectoryPath(targetNode);
     
     // Don't allow dropping on itself or its children
     if (draggedNode.path === targetPath || 
         targetPath.startsWith(draggedNode.path + '/')) {
-      setDraggedNode(null);
+      resetDragState();
       return;
     }
     
@@ -335,7 +352,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
     
     // Don't move if it's the same location
     if (draggedNode.path === newPath) {
-      setDraggedNode(null);
+      resetDragState();
       return;
     }
     
@@ -351,8 +368,8 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
       console.error('Failed to move file:', error);
       alert('Failed to move file: ' + (error as Error).message);
     }
-    
-    setDraggedNode(null);
+
+    resetDragState();
   };
 
   const getFileIcon = (filename: string) => {
@@ -389,8 +406,8 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
       <div
         key={`${node.path}-${index}`}
         className={`absolute w-full file-tree-item group ${
-          node.type === 'file' ? 'cursor-pointer hover:bg-gray-100' : 'cursor-pointer hover:bg-gray-100'
-        } ${isDraggedOver ? 'bg-blue-100 border-2 border-blue-300 border-dashed' : ''} ${
+          node.type === 'file' ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50' : 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50'
+        } ${isDraggedOver ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-750 border-dashed' : ''} ${
           isDragging ? 'opacity-50' : ''
         }`}
         style={{ 
@@ -400,6 +417,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
         }}
         draggable={!isEditing}
         onDragStart={(e) => handleDragStart(e, node)}
+        onDragEnd={resetDragState}
         onDragOver={(e) => handleDragOver(e, node)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, node)}
@@ -416,12 +434,12 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
       >
         <div className="flex items-center space-x-2 py-1 h-full">
           {node.type === 'directory' && (
-            <span className="text-gray-500 text-xs w-4 flex justify-center">
+            <span className="text-gray-500 dark:text-gray-400 text-xs w-4 flex justify-center">
               {isExpanded ? '▼' : '▶'}
             </span>
           )}
           {node.type === 'file' && <span className="w-4"></span>}
-          <span className="text-gray-600 text-xs">
+          <span className="text-gray-600 dark:text-gray-400 text-xs">
             {node.type === 'directory' ? '📁' : getFileIcon(node.name)}
           </span>
           
@@ -438,11 +456,11 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
                   setEditingNode(null);
                 }
               }}
-              className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
+              className="text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-blue-500 dark:border-blue-400 rounded px-1 py-0 flex-1 min-w-0"
               autoFocus
             />
           ) : (
-            <span className="text-sm text-gray-800 truncate flex-1 min-w-0">{node.name}</span>
+            <span className="text-sm text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0">{node.name}</span>
           )}
         </div>
       </div>
@@ -454,13 +472,13 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-gray-200 bg-white">
+      <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900">Files ({flattenedNodes.length})</h3>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Files ({flattenedNodes.length})</h3>
           <div className="flex items-center space-x-1">
             <button
               onClick={() => handleCreateFile()}
-              className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               title="New File"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,7 +487,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
             </button>
             <button
               onClick={() => handleCreateFolder()}
-              className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               title="New Folder"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -478,7 +496,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
             </button>
             <button
               onClick={onRefresh}
-              className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               title="Refresh"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -491,14 +509,30 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
       
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto bg-gray-50 relative" 
+        className={`flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative ${dragOverNode === 'root' ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`} 
         onContextMenu={(e) => handleContextMenu(e, null, true)}
-        onDragOver={(e) => handleDragOver(e)}
-        onDrop={(e) => handleDrop(e)}
+        onDragOver={(e) => {
+          if (e.target !== e.currentTarget) {
+            return;
+          }
+          handleDragOver(e);
+        }}
+        onDragLeave={(e) => {
+          if (e.target !== e.currentTarget) {
+            return;
+          }
+          handleDragLeave(e);
+        }}
+        onDrop={(e) => {
+          if (e.target !== e.currentTarget) {
+            return;
+          }
+          handleDrop(e);
+        }}
         onScroll={handleScroll}
       >
         {flattenedNodes.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
             No files found
           </div>
         ) : (
@@ -510,7 +544,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
         {/* Show create input at root level */}
         {creatingNode && creatingNode.parentPath === '' && (
           <div 
-            className="absolute file-tree-item bg-white border border-blue-300 z-10" 
+            className="absolute file-tree-item bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-400 z-10" 
             style={{ 
               top: totalHeight,
               left: 8,
@@ -520,7 +554,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
           >
             <div className="flex items-center space-x-2 py-1 h-full">
               <span className="w-4"></span>
-              <span className="text-gray-600 text-xs">
+              <span className="text-gray-600 dark:text-gray-400 text-xs">
                 {creatingNode.type === 'directory' ? '📁' : '📄'}
               </span>
               <input
@@ -536,7 +570,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
                     setCreatingName('');
                   }
                 }}
-                className="text-sm bg-white border border-blue-500 rounded px-1 py-0 flex-1 min-w-0"
+                className="text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-blue-500 dark:border-blue-400 rounded px-1 py-0 flex-1 min-w-0"
                 placeholder={`New ${creatingNode.type} name`}
                 autoFocus
               />
@@ -549,7 +583,7 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
       {contextMenu.visible && (
         <div
           ref={contextMenuRef}
-          className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 min-w-40"
+          className="fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md shadow-lg z-50 py-1 min-w-40 text-gray-900 dark:text-gray-100"
           style={{
             left: `${contextMenu.x}px`,
             top: `${contextMenu.y}px`,
@@ -559,14 +593,14 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
             <>
               <button
                 onClick={() => handleCreateFile()}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-2 transition-colors"
               >
                 <span>📄</span>
                 <span>New File</span>
               </button>
               <button
                 onClick={() => handleCreateFolder()}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-2 transition-colors"
               >
                 <span>📁</span>
                 <span>New Folder</span>
@@ -578,31 +612,31 @@ export const VirtualizedFileTree: React.FC<VirtualizedFileTreeProps> = ({
                 <>
                   <button
                     onClick={() => handleCreateFile(contextMenu.node?.path)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-2 transition-colors"
                   >
                     <span>📄</span>
                     <span>New File</span>
                   </button>
                   <button
                     onClick={() => handleCreateFolder(contextMenu.node?.path)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-2 transition-colors"
                   >
                     <span>📁</span>
                     <span>New Folder</span>
                   </button>
-                  <hr className="my-1 border-gray-200" />
+                  <hr className="my-1 border-gray-200 dark:border-gray-800" />
                 </>
               )}
               <button
                 onClick={() => contextMenu.node && handleRename(contextMenu.node)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center space-x-2 transition-colors"
               >
                 <span>✏️</span>
                 <span>Rename</span>
               </button>
               <button
                 onClick={() => contextMenu.node && handleDelete(contextMenu.node)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-red-600 flex items-center space-x-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center space-x-2 transition-colors"
               >
                 <span>🗑️</span>
                 <span>Delete</span>

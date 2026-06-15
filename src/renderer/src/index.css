@@ -2,7 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CodeMirror styling */
+/* ──────────────────────────────────────────────────────────
+   One Dark Pro palette (CSS custom properties)
+   These are used by both Tailwind dark: classes (through
+   the config remap) and the raw CSS rules below.
+   ────────────────────────────────────────────────────────── */
+:root {
+  /* One Dark Pro - syntax colours */
+  --odp-red:        #e06c75;
+  --odp-dark-red:   #be5046;
+  --odp-green:      #98c379;
+  --odp-yellow:     #e5c07b;
+  --odp-dark-yellow:#d19a66;
+  --odp-blue:       #61afef;
+  --odp-magenta:    #c678dd;
+  --odp-cyan:       #56b6c2;
+  --odp-white:      #abb2bf;
+  --odp-black:      #21252b;
+  /* One Dark Pro - UI colours */
+  --odp-bg:         #282c34;
+  --odp-bg-dark:    #21252b;
+  --odp-bg-light:   #2c313a;
+  --odp-fg:         #abb2bf;
+  --odp-fg-dim:     #5c6370;
+  --odp-selection:  #3e4451;
+  --odp-border:     #3e4452;
+  --odp-gutter:     #636d83;
+  --odp-accent:     #528bff;
+  --odp-cursor:     #528bff;
+  --odp-line-hl:    rgba(44, 49, 58, 0.6);
+}
+
+@layer base {
+  body {
+    @apply antialiased text-gray-900 bg-gray-50 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300;
+  }
+
+  /* Give dark mode the exact One Dark Pro feel on root-level surfaces */
+  .dark body {
+    color: var(--odp-fg);
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border border-white/20 dark:border-gray-700/30 shadow-xl;
+  }
+  .glass-header {
+    @apply bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50;
+  }
+}
+
+/* ======================================================
+   CodeMirror – One Dark Pro editor theme
+   ====================================================== */
 .editor-container {
   font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
@@ -21,22 +74,152 @@
   outline: none;
 }
 
-/* File tree */
+/* ── One Dark Pro gutter & editor chrome in dark mode ── */
+.dark .editor-container .cm-editor {
+  background-color: var(--odp-bg);
+}
+
+.dark .editor-container .cm-gutters {
+  background-color: var(--odp-bg);
+  color: var(--odp-gutter);
+  border-right: 1px solid var(--odp-border);
+}
+
+.dark .editor-container .cm-activeLineGutter {
+  background-color: var(--odp-bg-light);
+  color: var(--odp-fg);
+}
+
+.dark .editor-container .cm-activeLine {
+  background-color: var(--odp-line-hl);
+}
+
+.dark .editor-container .cm-content {
+  caret-color: var(--odp-cursor);
+  color: var(--odp-fg);
+}
+
+.dark .editor-container .cm-cursor,
+.dark .editor-container .cm-dropCursor {
+  border-left-color: var(--odp-cursor);
+}
+
+.dark .editor-container .cm-selectionBackground,
+.dark .editor-container .cm-focused .cm-selectionBackground,
+.dark .editor-container ::selection {
+  background-color: var(--odp-selection) !important;
+}
+
+.dark .editor-container .cm-matchingBracket {
+  color: var(--odp-green) !important;
+  background-color: rgba(97, 175, 239, 0.15);
+  outline: 1px solid rgba(97, 175, 239, 0.3);
+}
+
+.dark .editor-container .cm-searchMatch {
+  background-color: rgba(229, 192, 123, 0.25);
+  outline: 1px solid rgba(229, 192, 123, 0.5);
+}
+
+.dark .editor-container .cm-searchMatch.cm-searchMatch-selected {
+  background-color: rgba(97, 175, 239, 0.3);
+}
+
+/* Fold gutter arrow colour */
+.dark .editor-container .cm-foldGutter span {
+  color: var(--odp-gutter);
+}
+
+.dark .editor-container .cm-foldGutter span:hover {
+  color: var(--odp-fg);
+}
+
+/* Scrollbar inside editor */
+.dark .editor-container .cm-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark .editor-container .cm-scroller::-webkit-scrollbar-track {
+  background: var(--odp-bg);
+}
+
+.dark .editor-container .cm-scroller::-webkit-scrollbar-thumb {
+  background: var(--odp-selection);
+  border-radius: 4px;
+}
+
+.dark .editor-container .cm-scroller::-webkit-scrollbar-thumb:hover {
+  background: var(--odp-gutter);
+}
+
+/* Panel (search, etc.) inside CodeMirror */
+.dark .editor-container .cm-panels {
+  background-color: var(--odp-bg-dark);
+  color: var(--odp-fg);
+  border-color: var(--odp-border);
+}
+
+.dark .editor-container .cm-panels input,
+.dark .editor-container .cm-panels button {
+  color: var(--odp-fg);
+}
+
+.dark .editor-container .cm-panels input {
+  background-color: var(--odp-bg);
+  border: 1px solid var(--odp-border);
+}
+
+/* Autocomplete / tooltip */
+.dark .editor-container .cm-tooltip {
+  background-color: var(--odp-bg-dark);
+  border: 1px solid var(--odp-border);
+  color: var(--odp-fg);
+}
+
+.dark .editor-container .cm-tooltip-autocomplete ul li[aria-selected] {
+  background-color: var(--odp-selection);
+  color: var(--odp-white);
+}
+
+/* Line number styling */
+.dark .editor-container .cm-lineNumbers .cm-gutterElement {
+  color: var(--odp-gutter);
+  min-width: 3ch;
+  padding: 0 8px 0 12px;
+}
+
+/* ======================================================
+   One Dark Pro syntax highlighting (overrides oneDark)
+   ====================================================== */
+.dark .editor-container .ͼb  { color: var(--odp-magenta); }   /* keyword */
+.dark .editor-container .ͼd  { color: var(--odp-dark-yellow); } /* number */
+.dark .editor-container .ͼe  { color: var(--odp-green); }     /* string */
+.dark .editor-container .ͼc  { color: var(--odp-fg-dim); }    /* comment */
+.dark .editor-container .ͼi  { color: var(--odp-red); }       /* tagName */
+.dark .editor-container .ͼj  { color: var(--odp-dark-yellow); } /* attributeName */
+.dark .editor-container .ͼl  { color: var(--odp-blue); }      /* variableName */
+.dark .editor-container .ͼm  { color: var(--odp-yellow); }    /* typeName */
+.dark .editor-container .ͼn  { color: var(--odp-cyan); }      /* operator */
+
+/* ======================================================
+   File tree
+   ====================================================== */
 .file-tree {
-  @apply select-none;
+  @apply select-none text-sm;
 }
 
 .file-tree-item {
-  @apply px-2 py-1 rounded transition-colors duration-150;
-  margin: 1px 4px;
+  @apply px-3 py-1.5 rounded-md transition-all duration-200 flex items-center text-gray-700 dark:text-gray-300;
+  margin: 2px 8px;
 }
 
 .file-tree-item:hover {
-  @apply bg-gray-100;
+  @apply bg-gray-200/50 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100;
 }
 
 .file-tree-item.active {
-  @apply bg-blue-100 text-blue-800;
+  @apply bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium;
 }
 
 /* Drag and drop */
@@ -49,98 +232,89 @@
 }
 
 .drag-over {
-  @apply bg-blue-100 border-2 border-blue-300 border-dashed;
+  @apply bg-blue-500/10 border-2 border-blue-400 border-dashed rounded-md;
 }
 
 .dragging {
-  @apply opacity-50;
+  @apply opacity-50 scale-95;
 }
 
-/* Custom scrollbar */
+/* ======================================================
+   Custom Minimal Scrollbar
+   ====================================================== */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  @apply bg-gray-400 dark:bg-gray-600;
 }
 
 /* PDF Viewer Scrollbar */
 .pdf-scroll-container::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
 }
 
 .pdf-scroll-container::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 6px;
+  background: transparent;
 }
 
 .pdf-scroll-container::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 6px;
-  border: 2px solid #f1f5f9;
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full border-2 border-solid border-transparent bg-clip-padding;
 }
 
 .pdf-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  @apply bg-gray-400 dark:bg-gray-600;
 }
 
 .pdf-scroll-container::-webkit-scrollbar-corner {
-  background: #f1f5f9;
+  background: transparent;
 }
 
-/* Dirty indicator animation */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+/* ======================================================
+   Dirty indicator animation
+   ====================================================== */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.95); }
 }
 
 .dirty-indicator {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-soft 2s ease-in-out infinite;
 }
 
 .compile-log {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-.topbar {
-  @apply h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-
-.log-panel {
-  @apply h-48 bg-gray-900 text-green-400 border-t border-gray-200;
-}
-
-/* Milestone 6: Error highlighting styles */
+/* ======================================================
+   Error highlighting styles
+   ====================================================== */
 .error-line {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: rgba(224, 108, 117, 0.12);
+  border-bottom: 1px dotted var(--odp-red);
 }
 
 .warning-line {
-  background-color: rgba(245, 158, 11, 0.1);
+  background-color: rgba(229, 192, 123, 0.12);
+  border-bottom: 1px dotted var(--odp-yellow);
 }
 
 .info-line {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: rgba(97, 175, 239, 0.12);
+  border-bottom: 1px dotted var(--odp-blue);
 }
 
 .error-marker {
@@ -156,144 +330,103 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-.error-marker:hover {
-  transform: scale(1.1);
+.error-marker:hover .error-marker-icon {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px currentColor;
 }
 
 .cm-error-gutter {
   width: 20px;
 }
 
-.errors-panel {
-  background-color: white;
-  border-top: 1px solid #e5e7eb;
+/* ======================================================
+   Slide-out Panels Common Styles (Glassmorphism)
+   ====================================================== */
+.slide-panel-container {
+  @apply fixed top-12 right-0 bottom-0 w-[400px] z-50 glass-panel transform translate-x-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)];
+  border-left-width: 1px;
 }
 
+.slide-panel-container.open {
+  @apply translate-x-0;
+}
+
+.slide-panel-overlay {
+  @apply fixed inset-0 top-12 bg-gray-900/20 dark:bg-black/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300;
+}
+
+.slide-panel-overlay.open {
+  @apply opacity-100 pointer-events-auto;
+}
+
+/* Specific panels */
+.history-panel-container,
+.log-panel-container,
 .errors-panel-container {
-  position: relative;
-  background-color: white;
-  border-top: 1px solid #e5e7eb;
+  @apply slide-panel-container;
 }
 
-/* Milestone 7: History panel styles */
-.history-panel {
-  background-color: white;
-  border-left: 1px solid #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.history-panel-container {
-  position: fixed;
-  top: 48px; /* Below topbar */
-  right: 0;
-  height: calc(100vh - 48px);
-  width: 400px;
-  z-index: 50;
-  transform: translateX(100%);
-  transition: transform 0.3s ease-in-out;
-  background-color: white;
-  border-left: 1px solid #e5e7eb;
-  box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.history-panel-container.open {
-  transform: translateX(0);
-}
-
-.history-panel-overlay {
-  position: fixed;
-  top: 48px; /* Below topbar */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  z-index: 40;
-  opacity: 0;
-  transition: opacity 0.3s ease-in-out;
-  pointer-events: none;
-}
-
-.history-panel-overlay.open {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Log Panel Slide-out Styles */
-.log-panel-container {
-  position: fixed;
-  top: 48px; /* Below topbar */
-  right: 0;
-  height: calc(100vh - 48px);
-  width: 400px;
-  z-index: 50;
-  transform: translateX(100%);
-  transition: transform 0.3s ease-in-out;
-  background-color: white;
-  border-left: 1px solid #e5e7eb;
-  box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.log-panel-container.open {
-  transform: translateX(0);
-}
-
-.log-panel-overlay {
-  position: fixed;
-  top: 48px; /* Below topbar */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  z-index: 40;
-  opacity: 0;
-  transition: opacity 0.3s ease-in-out;
-  pointer-events: none;
-}
-
-.log-panel-overlay.open {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Errors Panel Slide-out Styles */
-.errors-panel-container {
-  position: fixed;
-  top: 48px; /* Below topbar */
-  right: 0;
-  height: calc(100vh - 48px);
-  width: 400px;
-  z-index: 50;
-  transform: translateX(100%);
-  transition: transform 0.3s ease-in-out;
-  background-color: white;
-  border-left: 1px solid #e5e7eb;
-  box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1), -2px 0 4px -1px rgba(0, 0, 0, 0.06);
-}
-
+.history-panel-container.open,
+.log-panel-container.open,
 .errors-panel-container.open {
-  transform: translateX(0);
+  @apply translate-x-0;
 }
 
+.history-panel-overlay,
+.log-panel-overlay,
 .errors-panel-overlay {
-  position: fixed;
-  top: 48px; /* Below topbar */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  z-index: 40;
-  opacity: 0;
-  transition: opacity 0.3s ease-in-out;
-  pointer-events: none;
+  @apply slide-panel-overlay;
 }
 
+.history-panel-overlay.open,
+.log-panel-overlay.open,
 .errors-panel-overlay.open {
-  opacity: 1;
-  pointer-events: auto;
+  @apply opacity-100 pointer-events-auto;
+}
+
+/* ======================================================
+   Form Inputs
+   ====================================================== */
+.minimal-input {
+  @apply w-full bg-gray-100 dark:bg-gray-800 border-none rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500/50 transition-all;
+}
+
+.minimal-button {
+  @apply px-4 py-2 rounded-lg text-sm font-medium transition-all active:scale-95;
+}
+.minimal-button-primary {
+  @apply minimal-button bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20;
+}
+.minimal-button-secondary {
+  @apply minimal-button bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100;
+}
+
+/* ======================================================
+   Global dark-mode overrides – One Dark Pro polish
+   These catch generic elements that Tailwind classes
+   might not cover (native inputs, selects, etc.)
+   ====================================================== */
+.dark input,
+.dark select,
+.dark textarea {
+  color-scheme: dark;
+}
+
+.dark ::placeholder {
+  color: var(--odp-fg-dim);
+}
+
+/* Range input (sliders) in dark mode */
+.dark input[type="range"] {
+  accent-color: var(--odp-accent);
+}
+
+/* Focus rings in dark mode – use One Dark Pro accent blue */
+.dark *:focus-visible {
+  outline-color: var(--odp-accent);
 }

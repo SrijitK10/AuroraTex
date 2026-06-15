@@ -76,10 +76,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ projectId, filePath, fileName
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-50">
+      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-sm text-gray-600">Loading image...</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading image...</p>
         </div>
       </div>
     );
@@ -87,20 +87,20 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ projectId, filePath, fileName
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-50">
+      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
           <div className="text-red-500 text-4xl mb-2">⚠️</div>
           <p className="text-sm text-red-600 mb-1">Failed to load image</p>
-          <p className="text-xs text-gray-500">{error}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-hidden bg-gray-50">
+    <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
       <div className="h-full flex items-center justify-center p-4">
-        <div className="max-w-full max-h-full overflow-hidden rounded-lg shadow-lg bg-white">
+        <div className="max-w-full max-h-full overflow-hidden rounded-lg shadow-lg bg-white dark:bg-gray-900 border dark:border-gray-800">
           <img
             src={imageUrl}
             alt={fileName}

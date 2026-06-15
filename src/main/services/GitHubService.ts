@@ -1,6 +1,8 @@
 import { app, shell } from 'electron';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
+
+// ─── Public Interfaces ──────────────────────────────────────────────────────
 
 export interface GitHubUser {
   login: string;
@@ -62,44 +64,125 @@ export interface GitHubCollaborator {
   };
 }
 
+// ─── Error helper ────────────────────────────────────────────────────────────
+
+/**
+ * Extract a plain, IPC-serializable error message from any thrown value.
+ * Electron's IPC cannot clone arbitrary Error objects across process
+ * boundaries, so we always rethrow with a plain string message.
+ */
+function toSerializableError(err: unknown): Error {
+  if (err instanceof Error) {
+    // GitHub API errors from Octokit often have useful `.response.data.message`
+    const apiMessage = (err as any)?.response?.data?.message;
+    const status = (err as any)?.status || (err as any)?.response?.status;
+
+    let msg = apiMessage || err.message || 'Unknown error';
+
+    // Detect rate-limiting
+    if (status === 403 && /rate limit/i.test(msg)) {
+      msg = 'GitHub API rate limit exceeded. Please wait a few minutes and try again.';
+    }
+    // Detect bad credentials
+    if (status === 401) {
+      msg = 'GitHub authentication failed. Your token may be invalid or expired. Please sign in again.';
+    }
+
+    return new Error(msg);
+  }
+  return new Error(String(err));
+}
+
+// ─── Service ─────────────────────────────────────────────────────────────────
+
 export class GitHubService {
   private octokit: any = null;
   private credentials: GitHubCredentials | null = null;
   private credentialsFile: string;
-  private Octokit: any = null;
+  private OctokitClass: any = null;
   private readonly browserAuthScope = 'repo read:user user:email';
+  private initPromise: Promise<void>;
 
   constructor() {
     this.credentialsFile = join(app.getPath('userData'), '.github-credentials.json');
-    this.loadCredentials();
+    this.initPromise = this.loadCredentials();
   }
 
+  // ─── Octokit loader ──────────────────────────────────────────────────────
+
   /**
-   * Get Octokit class (lazy load)
+   * Lazily load the Octokit class.
+   *
+   * `@octokit/rest` is an ESM-only package.  The main process is compiled to
+   * CommonJS (tsconfig.main.json → "module": "commonjs"), so we use a dynamic
+   * `import()` expression.  TypeScript compiles `import()` to `require()` for
+   * CommonJS targets by default, but Electron's Node supports real ESM dynamic
+   * import, so we use Function-based dynamic import to bypass TS compilation.
    */
-  private async getOctokit(): Promise<any> {
-    if (!this.Octokit) {
-      const module = await eval('import("@octokit/rest")');
-      this.Octokit = module.Octokit;
+  private async getOctokitClass(): Promise<any> {
+    if (!this.OctokitClass) {
+      try {
+        // Use Function constructor to preserve the real dynamic import() for ESM
+        // packages in an Electron CommonJS context.  This avoids the old eval()
+        // hack and is safe because the module specifier is a static string.
+        const dynamicImport = new Function('specifier', 'return import(specifier)');
+        const module = await dynamicImport('@octokit/rest');
+        this.OctokitClass = module.Octokit;
+      } catch (importErr) {
+        console.error('[GitHubService] Failed to import @octokit/rest:', importErr);
+        throw new Error(
+          'Failed to load GitHub integration. The @octokit/rest package may not be installed.'
+        );
+      }
     }
-    return this.Octokit;
+    return this.OctokitClass;
   }
 
+  private createOctokitInstance(token: string): any {
+    if (!this.OctokitClass) {
+      throw new Error('Octokit not loaded yet. Call getOctokitClass() first.');
+    }
+    return new this.OctokitClass({ auth: token });
+  }
+
+  // ─── Credential persistence ──────────────────────────────────────────────
+
   /**
-   * Load saved credentials
+   * Load saved credentials and validate the token is still valid.
    */
   private async loadCredentials(): Promise<void> {
     try {
-      if (existsSync(this.credentialsFile)) {
-        const data = readFileSync(this.credentialsFile, 'utf-8');
-        this.credentials = JSON.parse(data);
-        
-        if (this.credentials?.token) {
-          const OctokitClass = await this.getOctokit();
-          this.octokit = new OctokitClass({
-            auth: this.credentials!.token
-          });
-          console.log('[GitHubService] Loaded credentials for:', this.credentials!.username);
+      if (!existsSync(this.credentialsFile)) return;
+
+      const raw = readFileSync(this.credentialsFile, 'utf-8').trim();
+      if (!raw || raw === '{}' || raw === '') return;
+
+      const parsed = JSON.parse(raw) as GitHubCredentials;
+      if (!parsed.token) return;
+
+      // Load Octokit
+      await this.getOctokitClass();
+      this.octokit = this.createOctokitInstance(parsed.token);
+
+      // Validate the token still works
+      try {
+        const { data: user } = await this.octokit.users.getAuthenticated();
+        this.credentials = {
+          ...parsed,
+          username: user.login, // Update in case username changed
+        };
+        console.log('[GitHubService] Loaded and validated credentials for:', user.login);
+      } catch (validationErr: any) {
+        const status = validationErr?.status || validationErr?.response?.status;
+        if (status === 401) {
+          console.warn('[GitHubService] Saved token is invalid/expired — clearing credentials');
+          this.clearCredentialFile();
+          this.octokit = null;
+          this.credentials = null;
+        } else {
+          // Network error or transient failure — keep the credentials, just skip validation
+          console.warn('[GitHubService] Could not validate token (might be offline):', validationErr.message);
+          this.credentials = parsed;
         }
       }
     } catch (error) {
@@ -109,13 +192,10 @@ export class GitHubService {
     }
   }
 
-  /**
-   * Save credentials
-   */
   private saveCredentials(): void {
     try {
       if (this.credentials) {
-        writeFileSync(this.credentialsFile, JSON.stringify(this.credentials, null, 2));
+        writeFileSync(this.credentialsFile, JSON.stringify(this.credentials, null, 2), 'utf-8');
         console.log('[GitHubService] Saved credentials');
       }
     } catch (error) {
@@ -123,9 +203,20 @@ export class GitHubService {
     }
   }
 
-  /**
-   * Get the public OAuth client id used by GitHub's browser/device flow.
-   */
+  private clearCredentialFile(): void {
+    try {
+      if (existsSync(this.credentialsFile)) {
+        // Overwrite with empty string then delete for security
+        writeFileSync(this.credentialsFile, '', 'utf-8');
+        unlinkSync(this.credentialsFile);
+      }
+    } catch (error) {
+      console.error('[GitHubService] Failed to clear credential file:', error);
+    }
+  }
+
+  // ─── OAuth helpers ───────────────────────────────────────────────────────
+
   private getOAuthClientId(): string {
     const clientId =
       process.env.GITHUB_OAUTH_CLIENT_ID ||
@@ -135,7 +226,7 @@ export class GitHubService {
 
     if (!clientId.trim()) {
       throw new Error(
-        'GitHub browser sign-in is not configured. Set GITHUB_CLIENT_ID to your GitHub OAuth app client ID.'
+        'GitHub browser sign-in is not configured. Set GITHUB_CLIENT_ID in your .env file.'
       );
     }
 
@@ -143,40 +234,53 @@ export class GitHubService {
   }
 
   /**
-   * POST form data to a GitHub OAuth endpoint and return the JSON payload.
+   * Check if browser auth is available (client ID is configured).
    */
+  isBrowserAuthAvailable(): boolean {
+    try {
+      this.getOAuthClientId();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async postGitHubOAuth(url: string, params: Record<string, string>): Promise<any> {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams(params).toString()
+      body: new URLSearchParams(params).toString(),
     });
 
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
 
     if (!response.ok && !data.error) {
-      throw new Error(data.error_description || data.message || `GitHub OAuth request failed (${response.status})`);
+      throw new Error(
+        data.error_description || data.message || `GitHub OAuth request failed (${response.status})`
+      );
     }
 
     return data;
   }
 
-  private async sleep(ms: number): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, ms));
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // ─── Authentication ──────────────────────────────────────────────────────
+
   /**
-   * Start GitHub browser/device authorization and open GitHub in the user's browser.
+   * Start GitHub browser/device authorization.
    */
   async startBrowserAuth(): Promise<GitHubBrowserAuthSession> {
     try {
       const clientId = this.getOAuthClientId();
       const data = await this.postGitHubOAuth('https://github.com/login/device/code', {
         client_id: clientId,
-        scope: this.browserAuthScope
+        scope: this.browserAuthScope,
       });
 
       if (data.error) {
@@ -194,56 +298,65 @@ export class GitHubService {
         userCode: data.user_code,
         verificationUri: data.verification_uri,
         expiresAt: new Date(Date.now() + Number(data.expires_in || 900) * 1000).toISOString(),
-        interval: Number(data.interval || 5)
+        interval: Number(data.interval || 5),
       };
     } catch (error) {
       console.error('[GitHubService] Failed to start browser auth:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
   /**
    * Poll GitHub until the browser/device authorization has completed.
    */
-  async completeBrowserAuth(deviceCode: string, interval: number = 5, expiresAt?: string): Promise<GitHubUser> {
-    const clientId = this.getOAuthClientId();
-    const deadline = expiresAt ? new Date(expiresAt).getTime() : Date.now() + 15 * 60 * 1000;
-    let pollInterval = Math.max(interval, 1);
+  async completeBrowserAuth(
+    deviceCode: string,
+    interval: number = 5,
+    expiresAt?: string
+  ): Promise<GitHubUser> {
+    try {
+      const clientId = this.getOAuthClientId();
+      const deadline = expiresAt ? new Date(expiresAt).getTime() : Date.now() + 15 * 60 * 1000;
+      let pollInterval = Math.max(interval, 1);
 
-    while (Date.now() < deadline) {
-      const data = await this.postGitHubOAuth('https://github.com/login/oauth/access_token', {
-        client_id: clientId,
-        device_code: deviceCode,
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
-      });
+      while (Date.now() < deadline) {
+        const data = await this.postGitHubOAuth('https://github.com/login/oauth/access_token', {
+          client_id: clientId,
+          device_code: deviceCode,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        });
 
-      if (data.access_token) {
-        return await this.authenticateWithToken(
-          data.access_token,
-          'browser',
-          typeof data.scope === 'string' ? data.scope.split(',').filter(Boolean) : []
-        );
+        if (data.access_token) {
+          return await this.authenticateWithToken(
+            data.access_token,
+            'browser',
+            typeof data.scope === 'string' ? data.scope.split(',').filter(Boolean) : []
+          );
+        }
+
+        if (data.error === 'authorization_pending') {
+          await this.sleep(pollInterval * 1000);
+          continue;
+        }
+
+        if (data.error === 'slow_down') {
+          pollInterval += 5;
+          await this.sleep(pollInterval * 1000);
+          continue;
+        }
+
+        throw new Error(data.error_description || data.error || 'GitHub browser sign-in failed.');
       }
 
-      if (data.error === 'authorization_pending') {
-        await this.sleep(pollInterval * 1000);
-        continue;
-      }
-
-      if (data.error === 'slow_down') {
-        pollInterval += 5;
-        await this.sleep(pollInterval * 1000);
-        continue;
-      }
-
-      throw new Error(data.error_description || data.error || 'GitHub browser sign-in failed.');
+      throw new Error('GitHub browser sign-in expired. Please try again.');
+    } catch (error) {
+      console.error('[GitHubService] Browser auth completion failed:', error);
+      throw toSerializableError(error);
     }
-
-    throw new Error('GitHub browser sign-in expired. Please try again.');
   }
 
   /**
-   * Authenticate with Personal Access Token
+   * Authenticate with a Personal Access Token.
    */
   async authenticateWithToken(
     token: string,
@@ -251,68 +364,64 @@ export class GitHubService {
     scopes: string[] = []
   ): Promise<GitHubUser> {
     try {
-      const OctokitClass = await this.getOctokit();
-      this.octokit = new OctokitClass({ auth: token });
-      
+      if (!token || !token.trim()) {
+        throw new Error('Token cannot be empty.');
+      }
+
+      await this.getOctokitClass();
+      this.octokit = this.createOctokitInstance(token.trim());
+
       // Verify token by getting user info
       const { data: user } = await this.octokit.users.getAuthenticated();
-      
+
       this.credentials = {
-        token,
+        token: token.trim(),
         username: user.login,
         authMethod,
-        scopes
+        scopes,
       };
-      
+
       this.saveCredentials();
-      
+
       console.log('[GitHubService] Authenticated as:', user.login);
-      
+
       return {
         login: user.login,
         name: user.name || user.login,
         email: user.email || '',
-        avatarUrl: user.avatar_url
+        avatarUrl: user.avatar_url,
       };
     } catch (error) {
       console.error('[GitHubService] Authentication failed:', error);
       this.octokit = null;
       this.credentials = null;
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
   /**
-   * Sign out
+   * Sign out — clear all credentials and state.
    */
   signOut(): void {
     this.octokit = null;
     this.credentials = null;
-    
-    try {
-      if (existsSync(this.credentialsFile)) {
-        writeFileSync(this.credentialsFile, '{}');
-      }
-      console.log('[GitHubService] Signed out');
-    } catch (error) {
-      console.error('[GitHubService] Failed to clear credentials:', error);
-    }
+    this.clearCredentialFile();
+    console.log('[GitHubService] Signed out');
   }
 
   /**
-   * Check if authenticated
+   * Check if authenticated.
    */
-  isAuthenticated(): boolean {
+  async isAuthenticated(): Promise<boolean> {
+    await this.initPromise;
     return this.octokit !== null && this.credentials !== null;
   }
 
-  /**
-   * Get current user
-   */
+  // ─── User info ───────────────────────────────────────────────────────────
+
   async getCurrentUser(): Promise<GitHubUser | null> {
-    if (!this.octokit) {
-      return null;
-    }
+    await this.initPromise;
+    if (!this.octokit) return null;
 
     try {
       const { data: user } = await this.octokit.users.getAuthenticated();
@@ -320,26 +429,25 @@ export class GitHubService {
         login: user.login,
         name: user.name || user.login,
         email: user.email || '',
-        avatarUrl: user.avatar_url
+        avatarUrl: user.avatar_url,
       };
     } catch (error) {
       console.error('[GitHubService] Failed to get current user:', error);
-      return null;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Get user's repositories
-   */
-  async getRepositories(): Promise<GitHubRepository[]> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+  // ─── Repository operations ──────────────────────────────────────────────
+
+  async getRepositories(page: number = 1, perPage: number = 100): Promise<GitHubRepository[]> {
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
       const { data: repos } = await this.octokit.repos.listForAuthenticatedUser({
         sort: 'updated',
-        per_page: 100
+        per_page: perPage,
+        page,
       });
 
       return repos.map((repo: any) => ({
@@ -349,28 +457,28 @@ export class GitHubService {
         private: repo.private,
         url: repo.html_url,
         cloneUrl: repo.clone_url,
-        defaultBranch: repo.default_branch
+        defaultBranch: repo.default_branch,
       }));
     } catch (error) {
       console.error('[GitHubService] Failed to get repositories:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Create a new repository
-   */
-  async createRepository(name: string, description: string, isPrivate: boolean): Promise<GitHubRepository> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+  async createRepository(
+    name: string,
+    description: string,
+    isPrivate: boolean
+  ): Promise<GitHubRepository> {
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
       const { data: repo } = await this.octokit.repos.createForAuthenticatedUser({
         name,
         description,
         private: isPrivate,
-        auto_init: true
+        auto_init: false,
       });
 
       console.log('[GitHubService] Created repository:', repo.full_name);
@@ -382,28 +490,30 @@ export class GitHubService {
         private: repo.private,
         url: repo.html_url,
         cloneUrl: repo.clone_url,
-        defaultBranch: repo.default_branch
+        defaultBranch: repo.default_branch,
       };
     } catch (error) {
       console.error('[GitHubService] Failed to create repository:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Get pull requests for a repository
-   */
-  async getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open'): Promise<GitHubPullRequest[]> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+  // ─── Pull requests ──────────────────────────────────────────────────────
+
+  async getPullRequests(
+    owner: string,
+    repo: string,
+    state: 'open' | 'closed' | 'all' = 'open'
+  ): Promise<GitHubPullRequest[]> {
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
       const { data: prs } = await this.octokit.pulls.list({
         owner,
         repo,
         state,
-        per_page: 50
+        per_page: 50,
       });
 
       return prs.map((pr: any) => ({
@@ -412,17 +522,14 @@ export class GitHubService {
         state: pr.state,
         author: pr.user?.login || 'unknown',
         createdAt: pr.created_at,
-        url: pr.html_url
+        url: pr.html_url,
       }));
     } catch (error) {
       console.error('[GitHubService] Failed to get pull requests:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Create a pull request
-   */
   async createPullRequest(
     owner: string,
     repo: string,
@@ -431,9 +538,8 @@ export class GitHubService {
     base: string,
     body?: string
   ): Promise<GitHubPullRequest> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
       const { data: pr } = await this.octokit.pulls.create({
@@ -442,7 +548,7 @@ export class GitHubService {
         title,
         head,
         base,
-        body
+        body,
       });
 
       console.log('[GitHubService] Created pull request:', pr.number);
@@ -453,27 +559,22 @@ export class GitHubService {
         state: pr.state,
         author: pr.user?.login || 'unknown',
         createdAt: pr.created_at,
-        url: pr.html_url
+        url: pr.html_url,
       };
     } catch (error) {
       console.error('[GitHubService] Failed to create pull request:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Fork a repository
-   */
+  // ─── Fork ────────────────────────────────────────────────────────────────
+
   async forkRepository(owner: string, repo: string): Promise<GitHubRepository> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
-      const { data: fork } = await this.octokit.repos.createFork({
-        owner,
-        repo
-      });
+      const { data: fork } = await this.octokit.repos.createFork({ owner, repo });
 
       console.log('[GitHubService] Forked repository:', fork.full_name);
 
@@ -484,42 +585,32 @@ export class GitHubService {
         private: fork.private,
         url: fork.html_url,
         cloneUrl: fork.clone_url,
-        defaultBranch: fork.default_branch
+        defaultBranch: fork.default_branch,
       };
     } catch (error) {
       console.error('[GitHubService] Failed to fork repository:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Get repository info from remote URL
-   */
+  // ─── URL parsing ─────────────────────────────────────────────────────────
+
   parseGitHubUrl(url: string): { owner: string; repo: string } | null {
     try {
-      // Match GitHub URLs like:
-      // https://github.com/owner/repo.git
-      // git@github.com:owner/repo.git
+      // SSH: git@github.com:owner/repo.git
       const sshMatch = url.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
       if (sshMatch) {
-        return {
-          owner: sshMatch[1],
-          repo: sshMatch[2].replace(/\.git$/, '')
-        };
+        return { owner: sshMatch[1], repo: sshMatch[2].replace(/\.git$/, '') };
       }
 
+      // HTTPS
       const normalized = url.includes('://') ? url : `https://${url}`;
       const parsed = new URL(normalized);
-      if (parsed.hostname !== 'github.com') {
-        return null;
-      }
+      if (parsed.hostname !== 'github.com') return null;
 
-      const [owner, repo] = parsed.pathname.replace(/^\/+/, '').split('/');
-      if (owner && repo) {
-        return {
-          owner,
-          repo: repo.replace(/\.git$/, '')
-        };
+      const parts = parsed.pathname.replace(/^\/+/, '').replace(/\.git$/, '').split('/');
+      if (parts.length >= 2 && parts[0] && parts[1]) {
+        return { owner: parts[0], repo: parts[1] };
       }
 
       return null;
@@ -529,25 +620,23 @@ export class GitHubService {
     }
   }
 
-  /**
-   * Invite a GitHub user to collaborate on a repository.
-   */
+  // ─── Collaboration ───────────────────────────────────────────────────────
+
   async inviteCollaborator(
     owner: string,
     repo: string,
     username: string,
     permission: 'pull' | 'triage' | 'push' | 'maintain' | 'admin' = 'push'
   ): Promise<GitHubCollaboratorInvite> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
       const response = await this.octokit.repos.addCollaborator({
         owner,
         repo,
         username,
-        permission
+        permission,
       });
 
       const invitation = response.data || null;
@@ -559,43 +648,38 @@ export class GitHubService {
         username,
         permission,
         status,
-        invitationUrl: invitation?.html_url
+        invitationUrl: invitation?.html_url,
       };
     } catch (error) {
       console.error('[GitHubService] Failed to invite collaborator:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * List collaborators for a repository.
-   */
   async getCollaborators(owner: string, repo: string): Promise<GitHubCollaborator[]> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+    await this.initPromise;
+    if (!this.octokit) throw new Error('Not authenticated with GitHub.');
 
     try {
       const { data } = await this.octokit.repos.listCollaborators({
         owner,
         repo,
-        per_page: 100
+        per_page: 100,
       });
 
       return data.map((collaborator: any) => ({
         login: collaborator.login,
         avatarUrl: collaborator.avatar_url,
-        permissions: collaborator.permissions || {}
+        permissions: collaborator.permissions || {},
       }));
     } catch (error) {
       console.error('[GitHubService] Failed to get collaborators:', error);
-      throw error;
+      throw toSerializableError(error);
     }
   }
 
-  /**
-   * Get credentials for Git operations
-   */
+  // ─── Credential access for GitService ────────────────────────────────────
+
   getCredentials(): GitHubCredentials | null {
     return this.credentials;
   }

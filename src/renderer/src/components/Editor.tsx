@@ -98,11 +98,27 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
   const viewRef = useRef<EditorView | null>(null);
   const [lastSaved, setLastSaved] = useState<{ [key: string]: Date }>({});
   const autosaveTimeoutRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
   const [isVimMode, setIsVimMode] = useState(false);
+
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'));
+        }
+      });
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
   const languageCompartment = useRef(new Compartment());
   const themeCompartment = useRef(new Compartment());
   const keymapCompartment = useRef(new Compartment());
+  const lastLocalEditRef = useRef<{ tabId: string | null; timestamp: number }>({
+    tabId: null,
+    timestamp: 0,
+  });
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
 
@@ -188,6 +204,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
       EditorView.updateListener.of((update) => {
         if (update.docChanged && activeTabId) {
           const content = update.state.doc.toString();
+          lastLocalEditRef.current = { tabId: activeTabId, timestamp: Date.now() };
           onContentChange(activeTabId, content);
           
           // Trigger autosave
@@ -255,18 +272,39 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
   // Update content when activeTab content changes externally
   useEffect(() => {
     if (viewRef.current && activeTab) {
-      const currentDoc = viewRef.current.state.doc.toString();
+      const view = viewRef.current;
+      const currentDoc = view.state.doc.toString();
       if (currentDoc !== activeTab.content) {
-        viewRef.current.dispatch({
+        const isRecentLocalEdit =
+          lastLocalEditRef.current.tabId === activeTab.id &&
+          Date.now() - lastLocalEditRef.current.timestamp < 1500;
+
+        if (isRecentLocalEdit && activeTab.isDirty) {
+          return;
+        }
+
+        const selection = view.state.selection.main;
+        const scrollTop = view.scrollDOM.scrollTop;
+        const scrollLeft = view.scrollDOM.scrollLeft;
+        const nextDocLength = activeTab.content.length;
+
+        view.dispatch({
           changes: {
             from: 0,
-            to: viewRef.current.state.doc.length,
+            to: view.state.doc.length,
             insert: activeTab.content,
           },
+          selection: {
+            anchor: Math.min(selection.anchor, nextDocLength),
+            head: Math.min(selection.head, nextDocLength),
+          },
         });
+
+        view.scrollDOM.scrollTop = scrollTop;
+        view.scrollDOM.scrollLeft = scrollLeft;
       }
     }
-  }, [activeTab?.content]);
+  }, [activeTab?.id, activeTab?.content, activeTab?.isDirty]);
 
   // Update language when tab changes
   useEffect(() => {
@@ -404,30 +442,30 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
 
   if (tabs.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center text-gray-500">
-          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="flex-1 flex items-center justify-center bg-transparent">
+        <div className="text-center text-gray-500 dark:text-gray-400">
+          <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <p className="text-lg font-medium">No files open</p>
-          <p className="text-sm">Select a file from the file tree to start editing</p>
+          <p className="text-lg font-medium text-gray-900 dark:text-gray-100">No files open</p>
+          <p className="text-sm mt-1">Select a file from the file tree to start editing</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex-1 flex flex-col bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm relative z-0">
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 bg-gray-50">
+      <div className="flex border-b border-gray-200/50 dark:border-gray-800/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex overflow-x-auto">
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`flex items-center px-4 py-2 border-r border-gray-200 cursor-pointer min-w-0 ${
+              className={`flex items-center px-4 py-2 border-r border-gray-200/50 dark:border-gray-800/50 cursor-pointer min-w-0 transition-colors ${
                 tab.id === activeTabId
-                  ? 'bg-white text-gray-900'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  ? 'bg-white/80 dark:bg-gray-800/80 text-blue-600 dark:text-blue-400 font-medium border-b-2 border-b-blue-500'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/50'
               }`}
               onClick={() => onTabSelect(tab.id)}
             >
@@ -447,7 +485,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
                   
                   onTabClose(tab.id);
                 }}
-                className="ml-1 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600"
+                className="ml-2 p-1 rounded-md hover:bg-gray-200/80 dark:hover:bg-gray-700/80 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -463,11 +501,11 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
         {activeTab && (
           <div className="absolute inset-0 flex flex-col">
             {/* Editor toolbar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="flex items-center justify-between px-4 py-2 bg-white/30 dark:bg-gray-900/30 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-800/50 z-10">
+              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                 <span>{activeTab.path}</span>
                 {isLatexFile(activeTab.name) && (
-                  <span className="text-blue-500 text-xs bg-blue-100 px-2 py-1 rounded">LaTeX</span>
+                  <span className="text-blue-500 text-xs bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded">LaTeX</span>
                 )}
                 {activeTab.isDirty ? (
                   <span className="text-orange-500 text-xs flex items-center">
@@ -490,7 +528,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
                 {/* Editor controls */}
                 <button
                   onClick={handleOpenSearch}
-                  className="px-2 py-1 rounded text-sm bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 transition-colors"
                   title="Search (Cmd/Ctrl+F)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -500,7 +538,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
                 
                 <button
                   onClick={handleFoldAll}
-                  className="px-2 py-1 rounded text-sm bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 transition-colors"
                   title="Fold All"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,7 +548,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
                 
                 <button
                   onClick={handleUnfoldAll}
-                  className="px-2 py-1 rounded text-sm bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 transition-colors"
                   title="Unfold All"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -520,18 +558,20 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
                 
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="px-2 py-1 rounded text-sm bg-gray-200 hover:bg-gray-300 text-gray-700"
-                  title="Toggle Dark Mode"
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-200/50 dark:hover:bg-gray-800/50 transition-colors"
+                  title="Toggle Editor Dark Mode"
                 >
-                  {isDarkMode ? '☀️' : '🌙'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
                 </button>
                 
                 <button
                   onClick={() => setIsVimMode(!isVimMode)}
-                  className={`px-2 py-1 rounded text-sm ${
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     isVimMode 
-                      ? 'bg-green-600 text-white hover:bg-green-700' 
-                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                      : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
                   }`}
                   title="Toggle Vim Mode"
                 >
@@ -541,14 +581,14 @@ export const Editor = forwardRef<EditorRef, EditorProps>(({
                 <button
                   onClick={handleSave}
                   disabled={!activeTab.isDirty}
-                  className={`px-3 py-1 rounded text-sm ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-1 ${
                     activeTab.isDirty
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-500/20 active:scale-95'
+                      : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
                   }`}
                   title="Save (Cmd/Ctrl+S)"
                 >
-                  Save
+                  <span>Save</span>
                 </button>
               </div>
             </div>

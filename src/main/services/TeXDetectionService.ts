@@ -17,6 +17,7 @@ export interface TeXDistribution {
   lualatex: TeXBinary;
   biber: TeXBinary;
   bibtex: TeXBinary;
+  synctex: TeXBinary;
   isBundled: boolean;
   isValid: boolean;
   isActive: boolean;
@@ -74,7 +75,7 @@ export class TeXDetectionService {
       return null;
     }
 
-    const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+    const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex', 'synctex'];
     const detectedBinaries: Record<string, TeXBinary> = {};
     let validCount = 0;
 
@@ -111,13 +112,14 @@ export class TeXDetectionService {
       lualatex: detectedBinaries.lualatex,
       biber: detectedBinaries.biber,
       bibtex: detectedBinaries.bibtex,
+      synctex: detectedBinaries.synctex,
     };
   }
 
   async detectSystemDistribution(): Promise<TeXDistribution | null> {
     console.log('[TeXDetectionService] Searching for system TeX distribution...');
     
-    const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex'];
+    const binaries = ['latexmk', 'pdflatex', 'xelatex', 'lualatex', 'biber', 'bibtex', 'synctex'];
     const detectedBinaries: Record<string, TeXBinary> = {};
     let validCount = 0;
 
@@ -167,6 +169,7 @@ export class TeXDetectionService {
       lualatex: detectedBinaries.lualatex,
       biber: detectedBinaries.biber,
       bibtex: detectedBinaries.bibtex,
+      synctex: detectedBinaries.synctex,
     };
   }
 
@@ -341,8 +344,10 @@ export class TeXDetectionService {
                                output.includes('Latexmk') ||
                                output.includes('BibTeX') ||
                                output.includes('Biber') ||
+                               output.includes('SyncTeX') ||
                                (binaryName === 'bibtex' && output.includes('BibTeX')) ||
-                               (binaryName === 'biber' && output.includes('biber'));
+                               (binaryName === 'biber' && output.includes('biber')) ||
+                               (binaryName === 'synctex' && output.includes('SyncTeX'));
           
           const isValid = (code === 0 && hasData) || isValidOutput || (code === 1 && isValidOutput);
           
@@ -441,6 +446,11 @@ export class TeXDetectionService {
         // Alternative Biber pattern
         const altMatch = line.match(/Biber ([0-9.]+)/);
         if (altMatch) return `Biber ${altMatch[1]}`;
+      }
+      
+      if (binaryName === 'synctex') {
+        const match = line.match(/SyncTeX ([0-9.]+)/i);
+        if (match) return `SyncTeX ${match[1]}`;
       }
     }
     

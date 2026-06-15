@@ -7,6 +7,10 @@
     "name": "SrijitK10",
     "email": "srijit@auroratex.dev"
   },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
@@ -25,7 +29,7 @@
     "prepare-release": "node resources/build/prepare-release.js"
   },
   "devDependencies": {
-    "@electron/notarize": "^2.1.0",
+    "@electron/notarize": "^3.1.1",
     "@types/better-sqlite3": "^7.6.4",
     "@types/node": "^20.5.0",
     "@types/react": "^18.2.20",
@@ -34,8 +38,8 @@
     "@types/uuid": "^9.0.2",
     "@vitejs/plugin-react": "^4.0.4",
     "concurrently": "^8.2.0",
-    "electron": "^25.6.0",
-    "electron-builder": "^24.6.3",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.1.6",
     "vite": "^4.4.9"
   },
@@ -63,6 +67,7 @@
     "better-sqlite3": "^12.2.0",
     "chokidar": "^3.6.0",
     "codemirror": "^6.0.1",
+    "dotenv": "^17.4.2",
     "lezer-tex": "^0.0.0-3",
     "lucide-react": "^0.562.0",
     "pdfjs-dist": "^3.9.179",
@@ -96,25 +101,27 @@
     "icon": "resources/icons/icon.png",
     "mac": {
       "category": "public.app-category.productivity",
+      "minimumSystemVersion": "12.0.0",
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         },
         {
           "target": "pkg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         }
       ],
       "icon": "resources/icons/icon.png",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "extendInfo": {
+        "LSMinimumSystemVersion": "12.0.0"
+      },
       "entitlements": "resources/entitlements.mac.plist",
       "entitlementsInherit": "resources/entitlements.mac.plist"
     },
