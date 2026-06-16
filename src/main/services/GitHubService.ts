@@ -222,7 +222,7 @@ export class GitHubService {
       process.env.GITHUB_OAUTH_CLIENT_ID ||
       process.env.GITHUB_CLIENT_ID ||
       process.env.VITE_GITHUB_CLIENT_ID ||
-      '';
+      'Ov23libzkA7ySvNDABfj'; // Fallback for packaged production app
 
     if (!clientId.trim()) {
       throw new Error(
