@@ -89,6 +89,11 @@
       "dist/**/*",
       "node_modules/**/*"
     ],
+    "npmRebuild": false,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**",
+      "**/*.node"
+    ],
     "extraResources": [
       {
         "from": "resources/",
@@ -178,7 +183,6 @@
     "pkg": {
       "license": "resources/license.txt"
     },
-    "afterSign": "resources/build/notarize.js",
     "beforeBuild": "resources/build/before-build.js"
   }
 }

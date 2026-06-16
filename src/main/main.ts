@@ -1,4 +1,12 @@
-import 'dotenv/config';
+// Only load dotenv in development – in production the module may not
+// be resolvable inside the ASAR bundle and there is no .env file anyway.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dotenv = require('dotenv');
+  dotenv.config();
+} catch {
+  // Running in packaged app – dotenv not available, which is expected.
+}
 import { app, BrowserWindow, ipcMain, protocol, shell, dialog } from 'electron';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
